@@ -25,12 +25,28 @@ Read this before every task. Keep it up to date when decisions change.
 
 ## Structure
 - `lib/nav.ts` — single source of truth for sidebar groups, labels, icons and each page's plan.
-- `app/page.tsx` — Home. `lib/sample.ts` holds sample data; replace each block with live data and
-  delete the sample when done.
-- `app/[section]/page.tsx` — placeholder page for every sidebar item. When building a real page,
-  create `app/<slug>/page.tsx`; it overrides the placeholder automatically.
-- `app/settings/page.tsx` + `components/CanvasConnect.tsx` — Connections screen.
+- Signed-in pages live in the `app/(app)/` route group (shares `app/(app)/layout.tsx`, which
+  renders the sidebar and redirects signed-out users to `/login`). The `(app)` folder name is a
+  route group — it does not appear in the URL, so `app/(app)/page.tsx` is still `/`.
+- `app/(app)/page.tsx` — Home. `lib/sample.ts` holds sample data; replace each block with live data
+  and delete the sample when done.
+- `app/(app)/[section]/page.tsx` — placeholder page for every sidebar item. When building a real
+  page, create `app/(app)/<slug>/page.tsx`; it overrides the placeholder automatically.
+- `app/(app)/settings/page.tsx` + `components/CanvasConnect.tsx` — Connections screen.
+- `app/privacy/page.tsx`, `app/terms/page.tsx` — public legal pages (outside `(app)`, no sidebar,
+  no login) for Google's OAuth consent screen. Keep them reachable while signed out.
 - `components/Icon.tsx` — inline stroke icons. Add new ones to `PATHS`.
+
+## Auth & data (Supabase, phase 1A)
+- Email magic-link login via `@supabase/ssr`. `proxy.ts` (Next 16 middleware) refreshes the session
+  and gates every route; only `/login`, `/auth/*`, `/privacy` and `/terms` are public.
+- Supabase clients: `lib/supabase/client.ts` (browser), `lib/supabase/server.ts` (server
+  components / route handlers), `lib/supabase/middleware.ts` (used by `proxy.ts`). Client code reads
+  `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (mapped in `next.config.mjs`).
+- Sign-in page: `app/login/page.tsx`. Magic-link lands on `app/auth/confirm/route.ts`; sign-out is
+  `app/auth/signout/route.ts`.
+- SQL schema + RLS: `supabase/migrations/`. See `SETUP.md` for the one-time dashboard steps.
+- `lib/crypto.ts` — AES-256-GCM encrypt/decrypt for saved tokens, server-only (`TOKEN_ENCRYPTION_KEY`).
 
 ## Secrets — non-negotiable
 - API keys and tokens live ONLY in Vercel → Settings → Environment Variables (and `.env.local` for

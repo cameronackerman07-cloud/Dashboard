@@ -8,6 +8,11 @@ const nextConfig = {
     NEXT_PUBLIC_SUPABASE_URL: process.env.SUPABASE_URL ?? "",
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
   },
+  // Pin the project root so Turbopack doesn't walk up into the home directory
+  // (there's no lockfile boundary above this folder).
+  turbopack: {
+    root: import.meta.dirname,
+  },
 };
 
 export default nextConfig;

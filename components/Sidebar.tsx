@@ -12,7 +12,13 @@ function hrefFor(item: NavItem) {
   return item.slug ? `/${item.slug}` : "/";
 }
 
-export function Sidebar({ badges = {} }: { badges?: Record<string, number> }) {
+export function Sidebar({
+  badges = {},
+  userEmail = "",
+}: {
+  badges?: Record<string, number>;
+  userEmail?: string;
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -113,6 +119,12 @@ export function Sidebar({ badges = {} }: { badges?: Record<string, number> }) {
               <Icon name="settings" />
               <span>Settings</span>
             </Link>
+            <form action="/auth/signout" method="post">
+              <button type="submit" className="rail-link" style={{ width: "100%", border: 0, background: "none", cursor: "pointer" }} title="Sign out">
+                <Icon name="logout" />
+                <span>Sign out</span>
+              </button>
+            </form>
           </>
         ) : (
           <>
@@ -166,10 +178,17 @@ export function Sidebar({ badges = {} }: { badges?: Record<string, number> }) {
               </Link>
               <div className="profile">
                 <span className="avatar">CA</span>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div className="profile-name">Cameron</div>
-                  <div className="profile-sub">Year 11 · HSC course</div>
+                  <div className="profile-sub profile-email" title={userEmail || undefined}>
+                    {userEmail || "Year 11 · HSC course"}
+                  </div>
                 </div>
+                <form action="/auth/signout" method="post" style={{ marginLeft: "auto" }}>
+                  <button type="submit" className="icon-btn" aria-label="Sign out" title="Sign out">
+                    <Icon name="logout" size={18} />
+                  </button>
+                </form>
               </div>
             </div>
           </>

@@ -30,6 +30,8 @@ const PATHS = {
   google: "M20 12a8 8 0 1 1-2.3-5.6M20 12h-8",
   arrow: "M5 12h14M13 6l6 6-6 6",
   check: "M4 12l5 5L20 6",
+  logout: "M15 4h4v16h-4M11 8l-4 4 4 4M7 12h10",
+  mail: "M3 6h18v12H3zM3 7l9 6 9-6",
 } as const;
 
 export type IconName = keyof typeof PATHS;

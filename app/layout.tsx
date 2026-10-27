@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { Sidebar } from "@/components/Sidebar";
-import { SAMPLE_TASKS } from "@/lib/sample";
 
 export const metadata: Metadata = {
   title: { default: "Dashboard", template: "%s · Dashboard" },
@@ -28,12 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
         />
       </head>
-      <body>
-        <div className="shell">
-          <Sidebar badges={{ assignments: SAMPLE_TASKS.length }} />
-          {children}
-        </div>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
