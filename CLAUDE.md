@@ -7,6 +7,10 @@ Read this before every task. Keep it up to date when decisions change.
 - Next.js 16 (App Router, TypeScript), plain CSS in `app/globals.css` — no Tailwind, no UI kit.
 - Hosting: Vercel (free). Code: GitHub (private repo).
 - Database, login, file storage: Supabase free tier (region: Sydney, ap-southeast-2).
+  Env names: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` (safe for the browser), `SUPABASE_SERVICE_ROLE_KEY`
+  (server only). Vercel wouldn't accept names containing "PUBLIC", so `next.config.mjs` passes the URL and
+  publishable key to the browser as `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+  Use those NEXT_PUBLIC_ names in client code; never expose the service role key.
 - Scheduled agents: Vercel Cron (free tier limits) or GitHub Actions or Supabase cron.
 - Weather: Open-Meteo (no key). Music: Spotify Web API.
 
