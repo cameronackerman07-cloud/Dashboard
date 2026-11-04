@@ -297,6 +297,24 @@ h1, h2, h3, p { margin: 0; }
 /* Email can be long — keep it on one line in the sidebar profile. */
 .profile-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
 
+/* ---------- Assignments / due-date tracker ---------- */
+.track-form { display: flex; flex-direction: column; gap: 10px; }
+.track-fields { display: flex; flex-wrap: wrap; gap: 10px; }
+.track-fields > .input { flex: 1 1 160px; min-width: 0; }
+.track-fields .track-add { flex: 0 0 auto; }
+select.input { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 14px; }
+
+.track-list { display: flex; flex-direction: column; }
+.track-list .task { border-bottom: 1px solid var(--line-soft); }
+.track-list .task:last-child { border-bottom: 0; }
+.task-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.task-del {
+  width: 32px; height: 32px; flex: none; border: 0; border-radius: 8px; background: transparent;
+  color: var(--faint); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;
+}
+.task-del:hover { background: var(--hover); color: var(--ink); }
+.track-empty { font-size: 14px; color: var(--muted); line-height: 1.5; }
+
 /* ---------- Sign-in page (Option A: black on white) ---------- */
 .auth {
   min-height: 100vh; min-height: 100dvh;

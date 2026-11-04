@@ -8,6 +8,7 @@ export type NavItem = {
   blurb: string; // one-line description for the page header
   phase: number; // build phase it switches on in
   plans: string[]; // what the page will do
+  built?: boolean; // true once the page has its own folder (no longer a placeholder)
 };
 
 export type NavGroup = { label: string; items: NavItem[] };
@@ -64,6 +65,7 @@ export const NAV: NavGroup[] = [
         icon: "tasks",
         blurb: "Everything due, from every school app",
         phase: 1,
+        built: true,
         plans: [
           "Combines tasks from Canvas, Google Classroom and Compass",
           "Sorts by due date and subject",

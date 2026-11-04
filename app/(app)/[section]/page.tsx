@@ -10,7 +10,9 @@ import { ALL_ITEMS } from "@/lib/nav";
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return ALL_ITEMS.filter((i) => i.slug).map((i) => ({ section: i.slug }));
+  // Skip the home slug and any page that now has its own folder (built: true),
+  // otherwise this dynamic route would try to prerender a path a real page owns.
+  return ALL_ITEMS.filter((i) => i.slug && !i.built).map((i) => ({ section: i.slug }));
 }
 
 type Props = { params: Promise<{ section: string }> };
