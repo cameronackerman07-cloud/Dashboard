@@ -1,11 +1,21 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { ModelPicker, useAiModel } from "@/components/ModelPicker";
+import type { AiModelOption } from "@/lib/ai";
 import { saveSummaryToNotes, summarise } from "./actions";
 
-export function SummariesClient({ courses }: { courses: string[] }) {
+export function SummariesClient({
+  courses,
+  models,
+}: {
+  courses: string[];
+  models: AiModelOption[];
+}) {
   const [pending, startTransition] = useTransition();
+  const [model, setModel] = useAiModel(models);
   const [summary, setSummary] = useState("");
+  const [summaryMeta, setSummaryMeta] = useState("");
   const [status, setStatus] = useState("");
   const [course, setCourse] = useState("");
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -18,10 +28,19 @@ export function SummariesClient({ courses }: { courses: string[] }) {
     }
     setStatus("");
     setSummary("");
+    setSummaryMeta("");
     startTransition(async () => {
-      const res = await summarise(text, course);
-      if (res.ok) setSummary(res.text);
-      else setStatus(res.text);
+      try {
+        const res = await summarise(text, course, model);
+        if (res.ok) {
+          setSummary(res.text);
+          setSummaryMeta(res.note ?? `Summarised by ${res.model}`);
+        } else {
+          setStatus(res.text);
+        }
+      } catch {
+        setStatus("Couldn't reach the server. Check your connection and try again.");
+      }
     });
   }
 
@@ -46,6 +65,7 @@ export function SummariesClient({ courses }: { courses: string[] }) {
     <>
       <section className="card" aria-label="Paste notes">
         <h2 className="card-title">Paste your notes</h2>
+        <ModelPicker models={models} value={model} onChange={setModel} />
         <div className="track-fields">
           <select
             className="input"
@@ -82,6 +102,7 @@ export function SummariesClient({ courses }: { courses: string[] }) {
             <h2 className="card-title">Summary</h2>
           </div>
           <p className="bubble-text">{summary}</p>
+          {summaryMeta ? <span className="card-meta">{summaryMeta}</span> : null}
           <div className="note-actions">
             <button type="button" className="btn" onClick={copy}>
               Copy

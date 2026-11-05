@@ -28,3 +28,13 @@ export async function createClient() {
     },
   );
 }
+
+// For server actions that spend something other than the database (like the AI
+// keys), where Row Level Security can't protect them.
+export async function isSignedIn(): Promise<boolean> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return !!user;
+}

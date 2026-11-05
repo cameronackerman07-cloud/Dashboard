@@ -84,5 +84,9 @@ then **redeploy**. The app tries whichever keys are present, in this order:
 | `OPENROUTER_API_KEY` | <https://openrouter.ai> |
 | `MISTRAL_API_KEY` | <https://console.mistral.ai> |
 
+You can then choose a model from the **AI model** dropdown on each of those pages, or leave it on
+Auto. Marking a **drawn** answer needs a model that can read images: Gemini, Groq and OpenRouter
+have one, and Mistral doesn't.
+
 Until a key is added, those three pages show a short "add a key" note. Everything else
 (Timetable, Notes, Study planner, Assignments) works without any AI key.

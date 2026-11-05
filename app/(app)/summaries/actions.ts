@@ -1,7 +1,8 @@
 "use server";
 
 import { createNoteWith } from "@/app/(app)/notes/actions";
-import { aiChat } from "@/lib/ai";
+import { aiChat, aiErrorMessage, fallbackNote } from "@/lib/ai";
+import { isSignedIn } from "@/lib/supabase/server";
 
 const SUMMARY_SYSTEM = `You summarise a student's study material. Reply with:
 1. A 2-3 sentence overview.
@@ -12,21 +13,25 @@ Stay faithful to the source, keep it concise and in plain English. Do not invent
 export async function summarise(
   text: string,
   course: string,
-): Promise<{ ok: boolean; text: string }> {
+  model?: string,
+): Promise<{ ok: boolean; text: string; model?: string; note?: string }> {
   const content = text.trim();
   if (content.length < 20) {
     return { ok: false, text: "Paste a bit more text to summarise." };
   }
+  if (!(await isSignedIn())) {
+    return { ok: false, text: "You've been signed out. Refresh the page and sign in again." };
+  }
 
   try {
     const subjectLine = course ? `Subject: ${course}.\n\n` : "";
-    const out = await aiChat(
+    const res = await aiChat(
       [{ role: "user", content: `${subjectLine}Summarise these study notes:\n\n${content}` }],
-      { system: SUMMARY_SYSTEM, temperature: 0.3 },
+      { system: SUMMARY_SYSTEM, temperature: 0.3, model },
     );
-    return { ok: true, text: out };
-  } catch {
-    return { ok: false, text: "Sorry — couldn't summarise just then. Try again in a moment." };
+    return { ok: true, text: res.text, model: res.modelLabel, note: fallbackNote(model, res) };
+  } catch (err) {
+    return { ok: false, text: aiErrorMessage(err) };
   }
 }
 

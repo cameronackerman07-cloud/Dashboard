@@ -353,6 +353,39 @@ textarea.input { height: auto; padding-top: 12px; padding-bottom: 12px; line-hei
 .chat-input { display: flex; gap: 10px; align-items: flex-end; }
 .chat-box { flex: 1; min-height: 52px; }
 
+/* ---------- AI model picker ---------- */
+.model-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.model-picker .input { flex: 1 1 220px; min-width: 0; }
+.ai-error {
+  font-size: 13px; font-weight: 500; line-height: 1.5; color: var(--ink);
+  background: var(--surface-2); border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+}
+
+/* ---------- HSC practice: answering and marking ---------- */
+.seg { display: inline-flex; align-self: flex-start; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); overflow: hidden; }
+.seg-btn { min-height: 44px; min-width: 76px; padding: 0 16px; border: 0; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.seg-btn:hover { background: var(--hover); }
+.seg-btn.is-active { background: var(--ink); color: #fff; }
+.seg-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.answer-box { width: 100%; }
+[hidden] { display: none !important; }
+
+.draw { display: flex; flex-direction: column; gap: 10px; }
+.draw-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.draw-canvas {
+  display: block; width: 100%; cursor: crosshair;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  /* Lined paper. It's only a CSS background, so it isn't sent to the marker. */
+  background-color: #fff;
+  background-image: repeating-linear-gradient(to bottom, transparent 0 31px, var(--line-soft) 31px 32px);
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+
+.mark-score { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.mark-sections { display: flex; flex-direction: column; gap: 18px; }
+.mark-section { display: flex; flex-direction: column; gap: 6px; }
+
 @media (max-width: 760px) {
   .notes-layout { grid-template-columns: 1fr; }
   .notes-list { position: static; }

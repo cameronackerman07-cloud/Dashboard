@@ -1,6 +1,7 @@
 "use server";
 
-import { aiChat, type AiMessage } from "@/lib/ai";
+import { aiChat, aiErrorMessage, fallbackNote } from "@/lib/ai";
+import { isSignedIn } from "@/lib/supabase/server";
 
 const TUTOR_SYSTEM = `You are a warm, patient tutor for a student in Year 11 doing the NSW HSC.
 Their subjects are: Engineering Studies, Mathematics Advanced, Mathematics Extension 1,
@@ -14,21 +15,27 @@ How to help:
 - If a question is unrelated to study, gently steer back.
 Never ask for personal information.`;
 
+export type TutorMessage = { role: "user" | "assistant"; content: string };
+
 export async function askTutor(
-  messages: AiMessage[],
-): Promise<{ ok: boolean; text: string }> {
+  messages: TutorMessage[],
+  model?: string,
+): Promise<{ ok: boolean; text: string; model?: string; note?: string }> {
   if (!messages.length) return { ok: false, text: "Ask a question to get started." };
+  if (!(await isSignedIn())) {
+    return { ok: false, text: "You've been signed out. Refresh the page and sign in again." };
+  }
 
   try {
-    const text = await aiChat(messages.slice(-12), {
-      system: TUTOR_SYSTEM,
-      temperature: 0.5,
-    });
-    return { ok: true, text };
-  } catch {
-    return {
-      ok: false,
-      text: "Sorry — the AI couldn't answer just then. Give it another go in a moment.",
-    };
+    const res = await aiChat(
+      messages.slice(-12).map((m) => ({
+        role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+        content: String(m.content),
+      })),
+      { system: TUTOR_SYSTEM, temperature: 0.5, model },
+    );
+    return { ok: true, text: res.text, model: res.modelLabel, note: fallbackNote(model, res) };
+  } catch (err) {
+    return { ok: false, text: aiErrorMessage(err) };
   }
 }

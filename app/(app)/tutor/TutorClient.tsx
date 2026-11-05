@@ -2,13 +2,16 @@
 
 import { useRef, useState, useTransition } from "react";
 import { Icon } from "@/components/Icon";
+import { ModelPicker, useAiModel } from "@/components/ModelPicker";
+import type { AiModelOption } from "@/lib/ai";
 import { askTutor } from "./actions";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant"; content: string; by?: string };
 
-export function TutorClient() {
+export function TutorClient({ models }: { models: AiModelOption[] }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [pending, startTransition] = useTransition();
+  const [model, setModel] = useAiModel(models);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   function send() {
@@ -21,8 +24,18 @@ export function TutorClient() {
     if (el) el.value = "";
 
     startTransition(async () => {
-      const res = await askTutor(next);
-      setMessages((cur) => [...cur, { role: "assistant", content: res.text }]);
+      try {
+        const res = await askTutor(
+          next.map(({ role, content }) => ({ role, content })),
+          model,
+        );
+        setMessages((cur) => [...cur, { role: "assistant", content: res.text, by: res.model }]);
+      } catch {
+        setMessages((cur) => [
+          ...cur,
+          { role: "assistant", content: "Couldn't reach the server. Check your connection and try again." },
+        ]);
+      }
     });
   }
 
@@ -35,6 +48,7 @@ export function TutorClient() {
 
   return (
     <section className="card chat" aria-label="Tutor chat">
+      <ModelPicker models={models} value={model} onChange={setModel} />
       <div className="chat-log">
         {messages.length === 0 ? (
           <p className="track-empty">
@@ -44,7 +58,9 @@ export function TutorClient() {
         ) : (
           messages.map((m, i) => (
             <div key={i} className={`bubble bubble-${m.role}`}>
-              <span className="bubble-who">{m.role === "user" ? "You" : "Tutor"}</span>
+              <span className="bubble-who">
+                {m.role === "user" ? "You" : m.by ? `Tutor · ${m.by}` : "Tutor"}
+              </span>
               <p className="bubble-text">{m.content}</p>
             </div>
           ))

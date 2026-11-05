@@ -56,10 +56,16 @@ Read this before every task. Keep it up to date when decisions change.
   flashcards); `0002_phase1_more.sql` (timetable, notes, study_blocks). Run each in the Supabase SQL
   editor. See `SETUP.md` for the one-time dashboard steps.
 - `lib/crypto.ts` — AES-256-GCM encrypt/decrypt for saved tokens, server-only (`TOKEN_ENCRYPTION_KEY`).
-- `lib/ai.ts` — server-only AI router (`aiChat`, `aiConfigured`). Tries free OpenAI-compatible
-  providers in order from whichever keys are set (GEMINI/GROQ/OPENROUTER/MISTRAL). AI pages
-  (`tutor`, `summaries`, `hsc-practice`) are `force-dynamic` and show `components/AiNotice.tsx`
-  until a key is added. Only send school content to models — never names, emails or tokens.
+- `lib/ai.ts` — server-only AI router (`aiChat`, `aiConfigured`, `availableModels`). `MODELS` lists
+  the free OpenAI-compatible models; only those with a key set (GEMINI/GROQ/OPENROUTER/MISTRAL) are
+  offered. Model IDs get retired often and then just return errors: update `MODELS` from the
+  provider deprecation pages linked in that file. AI pages (`tutor`, `summaries`, `hsc-practice`)
+  are `force-dynamic`, `maxDuration = 60` and show `components/AiNotice.tsx` until a key is added.
+  Only send school content to models — never names, emails or tokens.
+- `components/ModelPicker.tsx` — the model dropdown and `useAiModel` (saved per device in
+  localStorage). A pick that fails falls back to the next model, and the page says so.
+- `components/DrawingPad.tsx` — handwriting canvas; exports a white-background JPEG. `lib/marking.ts`
+  splits the marker's reply into sections. Drawings need a model with `vision: true`.
 
 ## Secrets — non-negotiable
 - API keys and tokens live ONLY in Vercel → Settings → Environment Variables (and `.env.local` for
@@ -90,10 +96,9 @@ Physics · VET Entertainment · English Standard  (see `COURSES` in `lib/nav.ts`
   (`/api/shortcuts/due`) authenticated with a per-user secret token.
 
 ## AI
-- One router in `lib/ai.ts`: try providers in order Gemini → Groq → OpenRouter (`:free` models) →
-  Mistral; on rate-limit/5xx move to the next. Groq, OpenRouter and Mistral are OpenAI-compatible
-  chat endpoints; Gemini has an OpenAI-compatible endpoint too. Keep model IDs in one config object
-  (they change often — check each provider's docs when building).
+- One router in `lib/ai.ts`: the picked model first, otherwise Gemini → Groq → OpenRouter → Mistral;
+  on any failure move to the next, and show the student the real reason if all fail. All four are
+  OpenAI-compatible chat endpoints. Keep model IDs in `MODELS` (they change often).
 - Free tiers may use prompts for training: never send names, emails, tokens or other personal
   details to a model. Send only the school content needed.
 - Tutor: hints first; full worked solution only when the user asks.

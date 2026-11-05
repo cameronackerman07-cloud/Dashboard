@@ -8,6 +8,13 @@ const nextConfig = {
     NEXT_PUBLIC_SUPABASE_URL: process.env.SUPABASE_URL ?? "",
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
   },
+  // HSC practice sends handwritten working as an image, which can exceed the 1 MB
+  // default. Vercel itself rejects anything over 4.5 MB, so stay under that.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "4mb",
+    },
+  },
   // Pin the project root so Turbopack doesn't walk up into the home directory
   // (there's no lockfile boundary above this folder).
   turbopack: {
