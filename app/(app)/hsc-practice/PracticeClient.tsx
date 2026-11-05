@@ -7,21 +7,22 @@ import { Icon } from "@/components/Icon";
 import { ModelPicker, useAiModel } from "@/components/ModelPicker";
 import { RichTextEditor, type RichTextHandle } from "@/components/RichTextEditor";
 import type { AiModelOption } from "@/lib/ai";
+import { bandLabel, bandOptions, LETTERS, pastPaperLinks, type BandLevel, type Mcq } from "@/lib/hsc";
 import type { ParsedMarking } from "@/lib/marking";
-import { generateQuestion, markAnswer } from "./actions";
+import { generateMcqs, generateQuestion, markAnswer, saveMcqMistakes } from "./actions";
 
-const NESA_LINKS = [
-  {
-    label: "NESA HSC past exam papers",
-    href: "https://www.educationstandards.nsw.edu.au/wps/portal/nesa/11-12/resources/hsc-exam-papers",
-  },
-  {
-    label: "NSW syllabuses & marking guidelines",
-    href: "https://curriculum.nsw.edu.au/",
-  },
+type Kind = "written" | "mcq" | "own";
+
+const KINDS: { id: Kind; label: string }[] = [
+  { id: "written", label: "Written answer" },
+  { id: "mcq", label: "Multiple choice" },
+  { id: "own", label: "My own question" },
 ];
 
 const CONNECTION_ERROR = "Couldn't reach the server. Check your connection and try again.";
+
+type Question = { text: string; course: string; topic: string; band: string | null; own: boolean };
+type McqSet = { course: string; topic: string; band: string | null; items: Mcq[]; meta: string };
 
 export function PracticeClient({
   courses,
@@ -34,14 +35,19 @@ export function PracticeClient({
   const [busy, setBusy] = useState<"generate" | "mark" | null>(null);
   const [model, setModel] = useAiModel(models);
 
+  const [kind, setKind] = useState<Kind>("written");
   const [course, setCourse] = useState(courses[0] ?? "");
   const [topic, setTopic] = useState("");
   const [marks, setMarks] = useState("4");
+  const [band, setBand] = useState<BandLevel>("any");
+  const [count, setCount] = useState("5");
+  const [ownText, setOwnText] = useState("");
 
   // The subject is kept with the question, so changing the dropdown afterwards
   // can't mark this answer as if it were a different subject.
-  const [question, setQuestion] = useState<{ text: string; course: string; topic: string } | null>(null);
+  const [question, setQuestion] = useState<Question | null>(null);
   const [questionMeta, setQuestionMeta] = useState("");
+  const [mcqs, setMcqs] = useState<McqSet | null>(null);
 
   const [mode, setMode] = useState<"type" | "draw">("type");
   const [answer, setAnswer] = useState("");
@@ -71,21 +77,59 @@ export function PracticeClient({
     setCardsFailed(false);
   }
 
-  function generate() {
-    if (pending) return;
+  function startOver() {
     setStatus("");
     setQuestion(null);
     setQuestionMeta("");
+    setMcqs(null);
     resetAnswer();
+  }
+
+  function chooseCourse(next: string) {
+    setCourse(next);
+    // Extension courses label bands differently, but the levels line up, so keep the choice.
+  }
+
+  function generate() {
+    if (pending) return;
+    startOver();
+
+    if (kind === "own") {
+      const text = ownText.trim();
+      if (text.length < 10) {
+        setStatus("Paste or type the question first.");
+        return;
+      }
+      const withMarks = /\bmarks?\b/i.test(text) ? text : `${text}\n\n(${marks} marks)`;
+      setQuestion({ text: withMarks, course, topic: "", band: null, own: true });
+      setQuestionMeta("Your own question");
+      return;
+    }
+
     setBusy("generate");
     startTransition(async () => {
       try {
-        const res = await generateQuestion(course, topic, marks, model);
-        if (res.ok) {
-          setQuestion({ text: res.text, course, topic });
-          setQuestionMeta(res.note ?? `Written by ${res.model}`);
+        if (kind === "mcq") {
+          const res = await generateMcqs({ course, topic, band, count: Number(count), model });
+          if (res.ok) {
+            setMcqs({
+              course,
+              topic,
+              band: bandLabel(course, band),
+              items: res.questions,
+              meta: res.note ?? `Written by ${res.model}`,
+            });
+          } else {
+            setStatus(res.text);
+          }
         } else {
-          setStatus(res.text);
+          const res = await generateQuestion({ course, topic, marks, band, model });
+          if (res.ok) {
+            setQuestion({ text: res.text, course, topic, band: bandLabel(course, band), own: false });
+            setQuestionMeta(res.note ?? `Written by ${res.model}`);
+          } else {
+            setStatus(res.text);
+          }
         }
       } catch {
         setStatus(CONNECTION_ERROR);
@@ -131,38 +175,110 @@ export function PracticeClient({
     });
   }
 
+  const generateLabel =
+    kind === "own" ? "Use this question" : busy === "generate" ? "Generating…" : "Generate";
+
   return (
     <>
       <section className="card" aria-label="Make a question">
         <h2 className="card-title">Practise a question</h2>
         <ModelPicker models={models} value={model} onChange={setModel} />
+
+        <div className="seg seg-wrap" role="group" aria-label="Question type">
+          {KINDS.map((k) => (
+            <button
+              key={k.id}
+              type="button"
+              className={`seg-btn${kind === k.id ? " is-active" : ""}`}
+              aria-pressed={kind === k.id}
+              onClick={() => {
+                setKind(k.id);
+                setStatus("");
+              }}
+            >
+              {k.label}
+            </button>
+          ))}
+        </div>
+
         <div className="track-fields">
-          <select className="input" value={course} onChange={(e) => setCourse(e.target.value)} aria-label="Subject">
+          <select className="input" value={course} onChange={(e) => chooseCourse(e.target.value)} aria-label="Subject">
             {courses.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
             ))}
           </select>
-          <input
-            className="input"
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="Topic (optional) e.g. Projectile motion"
-            aria-label="Topic"
-            maxLength={120}
-          />
-          <select className="input" value={marks} onChange={(e) => setMarks(e.target.value)} aria-label="Marks">
-            {["2", "3", "4", "5", "6", "8"].map((m) => (
-              <option key={m} value={m}>
-                {m} marks
-              </option>
-            ))}
-          </select>
-          <button type="button" className="btn btn-dark track-add" onClick={generate} disabled={pending}>
-            {busy === "generate" ? "Generating…" : "Generate"}
-          </button>
+          {kind !== "own" ? (
+            <>
+              <input
+                className="input"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="Topic (optional) e.g. Projectile motion"
+                aria-label="Topic"
+                maxLength={120}
+              />
+              <select
+                className="input"
+                value={band}
+                onChange={(e) => setBand(e.target.value as BandLevel)}
+                aria-label="Band level"
+              >
+                {bandOptions(course).map((b) => (
+                  <option key={b.value} value={b.value}>
+                    {b.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : null}
+          {kind === "mcq" ? (
+            <select className="input" value={count} onChange={(e) => setCount(e.target.value)} aria-label="How many questions">
+              {["5", "10"].map((n) => (
+                <option key={n} value={n}>
+                  {n} questions
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select className="input" value={marks} onChange={(e) => setMarks(e.target.value)} aria-label="Marks">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "12", "15", "20"].map((m) => (
+                <option key={m} value={m}>
+                  {m} {m === "1" ? "mark" : "marks"}
+                </option>
+              ))}
+            </select>
+          )}
+          {kind !== "own" ? (
+            <button type="button" className="btn btn-dark track-add" onClick={generate} disabled={pending}>
+              {generateLabel}
+            </button>
+          ) : null}
         </div>
+
+        {kind === "own" ? (
+          <>
+            <textarea
+              className="input own-question"
+              value={ownText}
+              onChange={(e) => setOwnText(e.target.value)}
+              placeholder="Paste or type a question from a past paper, a trial paper or your textbook…"
+              aria-label="Your question"
+              rows={5}
+              maxLength={6000}
+            />
+            <div className="note-actions">
+              <button type="button" className="btn btn-dark" onClick={generate} disabled={pending}>
+                {generateLabel}
+              </button>
+              <span className="card-meta">
+                If the question doesn&apos;t say how many marks it&apos;s worth, the number you picked is added.
+              </span>
+            </div>
+          </>
+        ) : null}
+
         {status ? (
           <p className="ai-error" role="alert">
             {status}
@@ -170,11 +286,18 @@ export function PracticeClient({
         ) : null}
       </section>
 
+      {mcqs ? (
+        <McqSetCard key={mcqs.items.map((q) => q.question).join("|")} set={mcqs} onNewSet={generate} pending={pending} />
+      ) : null}
+
       {question ? (
         <section className="card" aria-label="Question">
           <div className="card-head">
             <h2 className="card-title">Question</h2>
-            <span className="chip-outline">{question.course}</span>
+            <div className="fc-tags">
+              {question.band ? <span className="chip-outline">{question.band}</span> : null}
+              <span className="chip-outline">{question.course}</span>
+            </div>
           </div>
           <p className="bubble-text">{question.text}</p>
           {questionMeta ? <span className="card-meta">{questionMeta}</span> : null}
@@ -269,20 +392,158 @@ export function PracticeClient({
         </section>
       ) : null}
 
-      <section className="card" aria-label="Official resources">
-        <h2 className="card-title">Official NESA resources</h2>
+      <section className="card" aria-label="Past papers">
+        <h2 className="card-title">Past papers for {course}</h2>
         <ul className="plan-list">
-          {NESA_LINKS.map((l) => (
+          {pastPaperLinks(course).map((l) => (
             <li key={l.href}>
               <Icon name="link" size={18} />
-              <a href={l.href} target="_blank" rel="noopener noreferrer">
-                {l.label}
-              </a>
+              <span className="link-stack">
+                <a href={l.href} target="_blank" rel="noopener noreferrer">
+                  {l.label}
+                </a>
+                <span className="card-meta">{l.note}</span>
+              </span>
             </li>
           ))}
         </ul>
-        <span className="card-meta">Opens on the official NESA / NSW Curriculum site in a new tab.</span>
+        <span className="card-meta">
+          Open a paper, then choose <strong>My own question</strong> and paste a question in to answer it here
+          and get it marked. The papers stay on their own sites, because they&apos;re NESA&apos;s and the
+          schools&apos; copyright.
+        </span>
       </section>
     </>
+  );
+}
+
+function McqSetCard({
+  set,
+  onNewSet,
+  pending,
+}: {
+  set: McqSet;
+  onNewSet: () => void;
+  pending: boolean;
+}) {
+  const [, startTransition] = useTransition();
+  const [chosen, setChosen] = useState<(number | null)[]>(() => set.items.map(() => null));
+  const [checked, setChecked] = useState(false);
+  const [cardNote, setCardNote] = useState("");
+
+  const score = set.items.filter((q, i) => chosen[i] === q.answer).length;
+  const unanswered = chosen.filter((c) => c === null).length;
+
+  function check() {
+    setChecked(true);
+    const mistakes = set.items.filter((q, i) => chosen[i] !== q.answer);
+    if (mistakes.length === 0) {
+      setCardNote("");
+      return;
+    }
+    setCardNote("Saving your mistakes as flashcards…");
+    startTransition(async () => {
+      try {
+        const res = await saveMcqMistakes({ course: set.course, topic: set.topic, mistakes });
+        setCardNote(
+          res.ok
+            ? `Added ${res.count === 1 ? "1 flashcard" : `${res.count} flashcards`} from the ones you got wrong.`
+            : "Your results are fine, but the flashcards couldn't be saved.",
+        );
+      } catch {
+        setCardNote("Your results are fine, but the flashcards couldn't be saved.");
+      }
+    });
+  }
+
+  return (
+    <section className="card" aria-label="Multiple choice">
+      <div className="card-head">
+        <h2 className="card-title">Multiple choice</h2>
+        <div className="fc-tags">
+          {set.band ? <span className="chip-outline">{set.band}</span> : null}
+          <span className="chip-outline">{set.course}</span>
+          {checked ? (
+            <span className="mark-score">
+              {score}/{set.items.length}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <span className="card-meta">{set.meta}. One mark each.</span>
+
+      <ol className="mcq-list">
+        {set.items.map((q, qi) => {
+          const right = chosen[qi] === q.answer;
+          return (
+            <li key={qi} className="mcq">
+              <fieldset className="mcq-fieldset">
+                <legend className="mcq-question">
+                  <span className="mcq-num">{qi + 1}.</span> {q.question}
+                </legend>
+                <div className="mcq-options">
+                  {q.options.map((option, oi) => {
+                    const isAnswer = oi === q.answer;
+                    const isChosen = chosen[qi] === oi;
+                    const state = !checked
+                      ? ""
+                      : isAnswer
+                        ? " is-correct"
+                        : isChosen
+                          ? " is-wrong"
+                          : "";
+                    return (
+                      <label key={oi} className={`mcq-option${isChosen ? " is-chosen" : ""}${state}`}>
+                        <input
+                          type="radio"
+                          name={`mcq-${qi}`}
+                          checked={isChosen}
+                          disabled={checked}
+                          onChange={() => setChosen((all) => all.map((c, i) => (i === qi ? oi : c)))}
+                        />
+                        <span className="mcq-letter">{LETTERS[oi]}</span>
+                        <span className="mcq-text">{option}</span>
+                        {checked && isAnswer ? <span className="mcq-tag">Correct answer</span> : null}
+                        {checked && isChosen && !isAnswer ? <span className="mcq-tag">Your answer</span> : null}
+                      </label>
+                    );
+                  })}
+                </div>
+                {checked ? (
+                  <p className="mcq-result">
+                    <strong>
+                      {right ? "Correct." : chosen[qi] === null ? "Not answered." : "Not quite."}
+                    </strong>{" "}
+                    {q.explanation}
+                  </p>
+                ) : null}
+              </fieldset>
+            </li>
+          );
+        })}
+      </ol>
+
+      <div className="note-actions">
+        {checked ? (
+          <button type="button" className="btn btn-dark" onClick={onNewSet} disabled={pending}>
+            {pending ? "Generating…" : "New set"}
+          </button>
+        ) : (
+          <button type="button" className="btn btn-dark" onClick={check}>
+            Check answers
+          </button>
+        )}
+        {!checked && unanswered > 0 ? (
+          <span className="card-meta">
+            {unanswered} not answered yet. Unanswered questions count as wrong.
+          </span>
+        ) : null}
+      </div>
+      {checked && cardNote ? (
+        <p className="mark-cards" role="status">
+          {cardNote} {cardNote.startsWith("Added") ? <Link href="/flashcards">Review flashcards</Link> : null}
+        </p>
+      ) : null}
+    </section>
   );
 }

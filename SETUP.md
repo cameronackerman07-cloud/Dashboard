@@ -83,6 +83,10 @@ then **redeploy**. The app tries whichever keys are present, in this order:
 | `GEMINI_API_KEY` | <https://aistudio.google.com> |
 | `OPENROUTER_API_KEY` | <https://openrouter.ai> |
 | `MISTRAL_API_KEY` | <https://console.mistral.ai> |
+| `CEREBRAS_API_KEY` | <https://cloud.cerebras.ai> |
+
+More keys means more models in the dropdown: each provider's other free chat models are listed
+under "more models" automatically.
 
 You can then choose a model from the **AI model** dropdown on each of those pages, or leave it on
 Auto. Marking a **drawn** answer needs a model that can read images: Gemini, Groq and OpenRouter
@@ -90,3 +94,15 @@ have one, and Mistral doesn't.
 
 Until a key is added, those three pages show a short "add a key" note. Everything else
 (Timetable, Notes, Study planner, Assignments) works without any AI key.
+
+## 9. (Optional) Connect your Sentral timetable
+No keys needed: this is done on the site itself.
+1. Sign in to your school's **Sentral portal** and open your **Timetable** or **Calendar**.
+2. Look for **Subscribe**, **Sync**, **iCal** or **Export**, and copy the link (often `webcal://…`).
+3. On the dashboard, open **Settings → Sentral timetable & calendar**, paste it and click **Test & connect**.
+   It then shows on Timetable, Calendar and Home.
+4. Only got a **.ics file** instead of a link? Use **Import a calendar file** on the same card. Import it
+   again whenever your timetable changes.
+
+Not every school turns on calendar links for students. If you can't find one, ask the school office,
+or add your classes by hand on the Timetable page.

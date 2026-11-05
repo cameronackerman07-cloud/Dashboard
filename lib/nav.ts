@@ -33,6 +33,7 @@ export const NAV: NavGroup[] = [
         icon: "calendar",
         blurb: "Every calendar in one view",
         phase: 1,
+        built: true,
         plans: [
           "Merges your personal and school Google calendars",
           "Adds Canvas, Compass and Atlantis events from their calendar links",

@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "HSC practice" };
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export default function HscPracticePage() {
+export default async function HscPracticePage() {
   const enabled = aiConfigured();
 
   return (
@@ -19,7 +19,7 @@ export default function HscPracticePage() {
         title="HSC practice"
         lede="Generate HSC-style questions by subject and topic, type or draw your working, and submit it for marking, with feedback and a worked solution. Links to the real past papers below."
       />
-      {enabled ? <PracticeClient courses={COURSES} models={availableModels()} /> : <AiNotice />}
+      {enabled ? <PracticeClient courses={COURSES} models={await availableModels()} /> : <AiNotice />}
     </main>
   );
 }

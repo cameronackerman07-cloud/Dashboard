@@ -34,12 +34,18 @@ Read this before every task. Keep it up to date when decisions change.
   When you build a real page, create `app/(app)/<slug>/page.tsx` AND set `built: true` on that item
   in `lib/nav.ts` (the placeholder skips built slugs in `generateStaticParams`, so they don't clash).
 - Built pages so far: `assignments` (due-date tracker), `timetable`, `notes`, `planner`,
-  `hsc-practice`, `tutor`, `summaries`, `flashcards`. Each has `page.tsx` (server, fetches data), usually a
+  `hsc-practice`, `tutor`, `summaries`, `flashcards`, `calendar`. Each has `page.tsx` (server, fetches data), usually a
   `*Client.tsx` (interactivity, optimistic updates) and `actions.ts` (server actions, RLS-scoped).
 - `components/PageHeader.tsx` — shared breadcrumb + icon + title + lede for built pages.
 - `components/DueSoon.tsx` — Home's live "Due soon" card. `lib/tasks.ts` — shared task shape +
   `formatDue` (pass `now` only after mount to avoid hydration mismatches).
 - `app/(app)/settings/page.tsx` + `components/CanvasConnect.tsx` — Connections screen.
+- Calendar link (Sentral or any .ics): `components/CalendarConnect.tsx` + `app/(app)/settings/actions.ts`.
+  The link is a secret, stored encrypted in `connections` (provider `sentral`). `lib/calendar.ts`
+  fetches it server-side with SSRF checks (https only, public hosts, checked redirects, 3 MB cap),
+  caches 15 min, and merges imported .ics files (`events`, source `sentral-file`) and due tasks.
+  `lib/ics.ts` parses .ics (time zones, daily/weekly repeats); `lib/time.ts` formats in Sydney time
+  so server and browser output match. Used by `calendar`, `timetable` and Home's Today card.
 - `app/privacy/page.tsx`, `app/terms/page.tsx` — public legal pages (outside `(app)`, no sidebar,
   no login) for Google's OAuth consent screen. Keep them reachable while signed out.
 - `components/Icon.tsx` — inline stroke icons. Add new ones to `PATHS`.
@@ -56,9 +62,10 @@ Read this before every task. Keep it up to date when decisions change.
   flashcards); `0002_phase1_more.sql` (timetable, notes, study_blocks). Run each in the Supabase SQL
   editor. See `SETUP.md` for the one-time dashboard steps.
 - `lib/crypto.ts` — AES-256-GCM encrypt/decrypt for saved tokens, server-only (`TOKEN_ENCRYPTION_KEY`).
-- `lib/ai.ts` — server-only AI router (`aiChat`, `aiConfigured`, `availableModels`). `MODELS` lists
-  the free OpenAI-compatible models; only those with a key set (GEMINI/GROQ/OPENROUTER/MISTRAL) are
-  offered. Model IDs get retired often and then just return errors: update `MODELS` from the
+- `lib/ai.ts` — server-only AI router (`aiChat`, `aiConfigured`, `availableModels`). `MODELS` is the
+  recommended list Auto tries; the picker also lists every other chat model each provider's `/models`
+  endpoint returns for the key (cached an hour; OpenRouter filtered to free models). Keys:
+  GEMINI/GROQ/OPENROUTER/MISTRAL/CEREBRAS. Model IDs get retired often and then just return errors: update `MODELS` from the
   provider deprecation pages linked in that file. AI pages (`tutor`, `summaries`, `hsc-practice`)
   are `force-dynamic`, `maxDuration = 60` and show `components/AiNotice.tsx` until a key is added.
   Only send school content to models — never names, emails or tokens.
@@ -70,6 +77,9 @@ Read this before every task. Keep it up to date when decisions change.
 - `components/RichTextEditor.tsx` — formatted typed answers, built on the browser's editing commands.
   Formatting is display-only: `toPlainText` sends text with `^`, `_` and `#` to the AI. Paste is
   plain text only, and the HTML is never saved.
+- `lib/hsc.ts` — band levels (E1–E4 for Extension courses), the multiple-choice shape, and
+  per-course past-paper links. Past papers are linked, never copied or scraped (NESA's and schools'
+  copyright); "My own question" lets the student paste one in to be marked.
 - `lib/marking.ts` splits the marker's reply into sections and flashcards. `markAnswer` saves the
   flashcards automatically; `lib/flashcards.ts` schedules reviews, shown on `app/(app)/flashcards`.
 

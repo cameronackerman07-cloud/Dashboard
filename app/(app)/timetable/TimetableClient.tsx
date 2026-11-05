@@ -1,8 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { Icon } from "@/components/Icon";
 import { addClass, deleteClass } from "./actions";
+
+// One weekday of events from the connected calendar, already formatted on the server.
+export type LinkedDay = {
+  n: number;
+  items: { id: string; time: string; title: string; location: string | null }[];
+  allDay: string[];
+};
 
 export type ClassRow = {
   id: string;
@@ -23,7 +31,19 @@ const DAYS = [
   { n: 5, label: "Friday" },
 ];
 
-export function TimetableClient({ classes, courses }: { classes: ClassRow[]; courses: string[] }) {
+export function TimetableClient({
+  classes,
+  courses,
+  linked,
+  linkError,
+  connected,
+}: {
+  classes: ClassRow[];
+  courses: string[];
+  linked: LinkedDay[] | null;
+  linkError: string | null;
+  connected: boolean;
+}) {
   const [, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -71,6 +91,20 @@ export function TimetableClient({ classes, courses }: { classes: ClassRow[]; cou
 
   return (
     <>
+      {linkError ? (
+        <p className="ai-error" role="alert">
+          {linkError} <Link href="/settings">Check the link in Settings</Link>
+        </p>
+      ) : null}
+      {!connected && !linked ? (
+        <div className="notice" role="note">
+          <span>Connect your Sentral timetable to fill this in automatically.</span>
+          <Link href="/settings" className="card-link">
+            Connect →
+          </Link>
+        </div>
+      ) : null}
+
       <section className="card" aria-label="Add a class">
         <h2 className="card-title">Add a class</h2>
         <form ref={formRef} action={handleAdd} className="track-form">
@@ -116,16 +150,42 @@ export function TimetableClient({ classes, courses }: { classes: ClassRow[]; cou
       <div className="tt-grid">
         {DAYS.map((d) => {
           const dayClasses = optimistic.filter((c) => c.day_of_week === d.n);
+          const fromLink = linked?.find((l) => l.n === d.n);
+          const linkedCount = (fromLink?.items.length ?? 0) + (fromLink?.allDay.length ?? 0);
           return (
             <section className={`card tt-col${d.n === todayN ? " tt-today" : ""}`} key={d.n} aria-label={d.label}>
               <div className="card-head">
                 <h2 className="card-title">{d.label}</h2>
                 {d.n === todayN ? <span className="chip">TODAY</span> : null}
               </div>
+              {fromLink && linkedCount > 0 ? (
+                <div className="tt-list">
+                  {fromLink.allDay.map((title, i) => (
+                    <div className="tt-item" key={`all-${i}`}>
+                      <div className="task-body">
+                        <span className="task-title">{title}</span>
+                        <span className="task-sub">All day</span>
+                      </div>
+                    </div>
+                  ))}
+                  {fromLink.items.map((item) => (
+                    <div className="tt-item" key={item.id}>
+                      <div className="task-body">
+                        <span className="task-title">{item.title}</span>
+                        <span className="task-sub">
+                          {[item.time, item.location].filter(Boolean).join(" · ")}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {dayClasses.length === 0 ? (
+                linkedCount > 0 ? null : (
                 <p className="track-empty" style={{ fontSize: 13 }}>
                   No classes yet.
                 </p>
+                )
               ) : (
                 <div className="tt-list">
                   {dayClasses.map((c) => (

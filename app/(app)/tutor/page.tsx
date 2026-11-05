@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "AI tutor" };
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export default function TutorPage() {
+export default async function TutorPage() {
   const enabled = aiConfigured();
 
   return (
@@ -18,7 +18,7 @@ export default function TutorPage() {
         title="AI tutor"
         lede="Hints first, full answers when you ask. Pick a model, or leave it on Auto."
       />
-      {enabled ? <TutorClient models={availableModels()} /> : <AiNotice />}
+      {enabled ? <TutorClient models={await availableModels()} /> : <AiNotice />}
     </main>
   );
 }

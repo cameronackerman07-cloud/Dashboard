@@ -28,7 +28,7 @@ export function AiNotice() {
         <li>
           <Icon name="arrow" size={18} />
           <span>
-            <strong>OPENROUTER_API_KEY</strong> or <strong>MISTRAL_API_KEY</strong> also work
+            <strong>OPENROUTER_API_KEY</strong>, <strong>CEREBRAS_API_KEY</strong> or <strong>MISTRAL_API_KEY</strong> also work
           </span>
         </li>
       </ul>

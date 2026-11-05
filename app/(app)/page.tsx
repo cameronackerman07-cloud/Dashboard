@@ -2,20 +2,70 @@ import Link from "next/link";
 import { DueSoon } from "@/components/DueSoon";
 import { Greeting } from "@/components/Greeting";
 import { Icon } from "@/components/Icon";
+import { getCalendarConnection, loadEvents } from "@/lib/calendar";
 import { createClient } from "@/lib/supabase/server";
-import { SAMPLE_HABITS, SAMPLE_PERIODS } from "@/lib/sample";
+import { SAMPLE_HABITS } from "@/lib/sample";
 import type { DbTask } from "@/lib/tasks";
+import { formatTime, startOfDay, weekday } from "@/lib/time";
+
+type TodayRow = { key: string; slot: string; name: string; sub: string | null; chip: "NOW" | "NEXT" | null };
 
 export default async function Home() {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("tasks")
-    .select("id, title, course, source, due_at, done")
-    .eq("done", false)
-    .order("due_at", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: true })
-    .limit(5);
+  const now = Date.now();
+  const [{ data }, { events }, connection, { data: manual }] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("id, title, course, source, due_at, done")
+      .eq("done", false)
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true })
+      .limit(5),
+    loadEvents(startOfDay(now), startOfDay(now, 1)),
+    getCalendarConnection(),
+    supabase
+      .from("timetable")
+      .select("id, period, subject, room")
+      .eq("day_of_week", weekday(now))
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+  ]);
   const dueSoon: DbTask[] = data ?? [];
+
+  // Today's classes: from the connected calendar if there is one, otherwise the
+  // classes added by hand on the Timetable page.
+  let today: TodayRow[];
+  let todaySource: string;
+  if (events.length > 0) {
+    const timed = events.filter((e) => !e.allDay);
+    const nextIndex = timed.findIndex((e) => e.start > now);
+    today = [
+      ...events
+        .filter((e) => e.allDay)
+        .map((e) => ({ key: e.id, slot: "All day", name: e.title, sub: null, chip: null })),
+      ...timed.map((e, i) => ({
+        key: e.id,
+        slot: formatTime(e.start),
+        name: e.title,
+        sub: e.location,
+        chip: e.start <= now && e.end > now ? ("NOW" as const) : i === nextIndex ? ("NEXT" as const) : null,
+      })),
+    ];
+    todaySource = "Sentral";
+  } else {
+    today = (manual ?? []).map((c: { id: string; period: string | null; subject: string; room: string | null }) => ({
+      key: c.id,
+      slot: c.period ?? "",
+      name: c.subject,
+      sub: c.room,
+      chip: null,
+    }));
+    todaySource = "Your timetable";
+  }
+  // Only the first upcoming class is "next", and only if nothing is on now.
+  if (today.some((r) => r.chip === "NOW")) {
+    today = today.map((r) => (r.chip === "NEXT" ? { ...r, chip: null } : r));
+  }
 
   return (
     <main className="main">
@@ -68,17 +118,34 @@ export default async function Home() {
         <section className="card" aria-label="Today's timetable">
           <div className="card-head">
             <h2 className="card-title">Today</h2>
-            <span className="card-meta">Atlantis Timetable</span>
+            <Link href={connection ? "/calendar" : "/timetable"} className="card-link">
+              {todaySource}
+            </Link>
           </div>
-          <div className="rows">
-            {SAMPLE_PERIODS.map((p) => (
-              <div className="row" key={p.slot}>
-                <span className="row-slot">{p.slot}</span>
-                <span className="row-main">{p.name}</span>
-                {p.next ? <span className="chip">NEXT</span> : null}
-              </div>
-            ))}
-          </div>
+          {today.length === 0 ? (
+            <p className="track-empty">
+              Nothing on today.{" "}
+              {connection ? null : (
+                <>
+                  <Link href="/settings">Connect Sentral</Link> or{" "}
+                  <Link href="/timetable">add your classes</Link> to see your day here.
+                </>
+              )}
+            </p>
+          ) : (
+            <div className="rows">
+              {today.map((p) => (
+                <div className="row" key={p.key}>
+                  <span className="row-slot">{p.slot}</span>
+                  <span className="row-main">
+                    {p.name}
+                    {p.sub ? <span className="task-sub"> · {p.sub}</span> : null}
+                  </span>
+                  {p.chip ? <span className="chip">{p.chip}</span> : null}
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="card" aria-label="Due soon">

@@ -406,6 +406,50 @@ textarea.input { height: auto; padding-top: 12px; padding-bottom: 12px; line-hei
 .mark-cards { font-size: 14px; font-weight: 500; line-height: 1.5; }
 .mark-cards a { text-decoration: underline; }
 
+/* ---------- HSC practice: question types and multiple choice ---------- */
+/* Three equal columns; a long label wraps inside its own button instead of breaking the row. */
+.seg-wrap { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; max-width: 520px; }
+.seg-wrap .seg-btn { min-width: 0; padding: 6px 8px; line-height: 1.2; }
+.own-question { width: 100%; }
+.link-stack { display: flex; flex-direction: column; gap: 2px; }
+.mcq-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 18px; }
+.mcq { padding-top: 16px; border-top: 1px solid var(--line-soft); }
+.mcq:first-child { padding-top: 0; border-top: 0; }
+.mcq-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.mcq-question { font-size: 15px; font-weight: 600; line-height: 1.5; white-space: pre-wrap; padding: 0; }
+.mcq-num { font-weight: 700; }
+.mcq-options { display: flex; flex-direction: column; gap: 6px; }
+.mcq-option {
+  display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 12px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm); cursor: pointer; font-size: 14px;
+}
+.mcq-option:hover { background: var(--hover); }
+.mcq-option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.mcq-option:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
+.mcq-letter {
+  width: 28px; height: 28px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line-strong); border-radius: 50%; font-weight: 700; font-size: 13px;
+}
+.mcq-text { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mcq-option.is-chosen { border-color: var(--ink); }
+.mcq-option.is-chosen .mcq-letter { background: var(--ink); color: #fff; border-color: var(--ink); }
+/* Results use weight and outline, not colour: right is solid, a wrong pick is dashed. */
+.mcq-option.is-correct { border: 2px solid var(--ink); font-weight: 600; }
+.mcq-option.is-wrong { border: 2px dashed var(--ink); }
+.mcq-option:has(input:disabled) { cursor: default; }
+.mcq-option:has(input:disabled):hover { background: transparent; }
+.mcq-tag { flex: none; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.mcq-result { font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+
+/* ---------- Calendar ---------- */
+.cal-day { gap: 8px; }
+.cal-row { align-items: flex-start; padding: 8px 0; }
+.cal-time { padding-top: 2px; }
+.cal-main { display: flex; flex-direction: column; gap: 2px; }
+.cal-title { overflow-wrap: anywhere; }
+.file-input { height: auto; padding: 10px 14px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+
 /* ---------- Flashcards ---------- */
 .fc { display: flex; flex-direction: column; gap: 12px; }
 .fc-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

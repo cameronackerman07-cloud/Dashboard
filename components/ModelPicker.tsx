@@ -41,32 +41,48 @@ export function ModelPicker({
   onChange: (id: string) => void;
 }) {
   const providers = [...new Set(models.map((m) => m.provider))];
+  const extraCount = models.filter((m) => !m.recommended).length;
+
+  function option(m: AiModelOption) {
+    return (
+      <option key={m.id} value={m.id}>
+        {m.label}
+        {m.vision ? " · reads drawings" : ""}
+      </option>
+    );
+  }
 
   return (
     <div className="model-picker">
       <label className="section-label" htmlFor="ai-model">
         AI model
       </label>
-      <select
-        id="ai-model"
-        className="input"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
+      <select id="ai-model" className="input" value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="auto">Auto (uses the next model if one is busy)</option>
-        {providers.map((provider) => (
-          <optgroup key={provider} label={provider}>
-            {models
-              .filter((m) => m.provider === provider)
-              .map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                  {m.vision ? " · reads drawings" : ""}
-                </option>
-              ))}
-          </optgroup>
-        ))}
+        {providers.map((provider) => {
+          const mine = models.filter((m) => m.provider === provider);
+          const recommended = mine.filter((m) => m.recommended);
+          const more = mine.filter((m) => !m.recommended);
+          return [
+            recommended.length ? (
+              <optgroup key={`${provider}-r`} label={`${provider} · recommended`}>
+                {recommended.map(option)}
+              </optgroup>
+            ) : null,
+            more.length ? (
+              <optgroup key={`${provider}-m`} label={`${provider} · more models`}>
+                {more.map(option)}
+              </optgroup>
+            ) : null,
+          ];
+        })}
       </select>
+      {extraCount > 0 ? (
+        <span className="field-help">
+          {models.length} models available. The ones under &quot;more models&quot; are untested here, so if one
+          fails, Auto takes over.
+        </span>
+      ) : null}
     </div>
   );
 }

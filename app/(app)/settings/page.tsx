@@ -1,7 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { CalendarConnect } from "@/components/CalendarConnect";
 import { CanvasConnect } from "@/components/CanvasConnect";
 import { Icon, type IconName } from "@/components/Icon";
+import { getCalendarConnection, IMPORT_SOURCE } from "@/lib/calendar";
+import { createClient } from "@/lib/supabase/server";
+import { formatShortDate } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Settings & connections" };
 
@@ -10,8 +14,8 @@ type Row = { name: string; desc: string; action: string; icon: IconName };
 const SCHOOL: Row[] = [
   { name: "Google — personal", desc: "Calendar, Drive and Google Classroom", action: "Connect", icon: "google" },
   { name: "Google — school", desc: "Add a second account. If your school blocks it, share the calendar to your personal account instead.", action: "Connect", icon: "google" },
-  { name: "Compass", desc: "Events and due dates via your calendar link", action: "Add link", icon: "link" },
-  { name: "Atlantis Timetable", desc: "Your classes via its calendar or export link", action: "Add link", icon: "timetable" },
+  { name: "Compass", desc: "For now, paste its calendar link into the calendar card above", action: "Add link", icon: "link" },
+  { name: "Atlantis Timetable", desc: "For now, paste its calendar link into the calendar card above", action: "Add link", icon: "timetable" },
 ];
 
 const DEVICES: Row[] = [
@@ -22,9 +26,10 @@ const DEVICES: Row[] = [
 ];
 
 const MODELS = [
-  { name: "Google Gemini", desc: "Main model — reads photos and PDFs of your work", env: "GEMINI_API_KEY" },
-  { name: "Groq", desc: "Very fast — used for the tutor chat", env: "GROQ_API_KEY" },
-  { name: "OpenRouter (free models)", desc: "Backup when the others hit their daily limit", env: "OPENROUTER_API_KEY" },
+  { name: "Google Gemini", desc: "Main model — reads handwriting and photos of your work", env: "GEMINI_API_KEY" },
+  { name: "Groq", desc: "Very fast, with several open models", env: "GROQ_API_KEY" },
+  { name: "Cerebras", desc: "Very fast, free daily allowance", env: "CEREBRAS_API_KEY" },
+  { name: "OpenRouter (free models)", desc: "Dozens of free models, and a backup when others hit their limit", env: "OPENROUTER_API_KEY" },
   { name: "Mistral", desc: "Extra backup", env: "MISTRAL_API_KEY" },
 ];
 
@@ -50,9 +55,15 @@ function ConnectionList({ rows }: { rows: Row[] }) {
   );
 }
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
   // Server-side check only: shows whether a key exists, never the key itself.
   const keyStatus = (env: string) => (process.env[env] ? "Key set" : "Key not set");
+
+  const supabase = await createClient();
+  const [connection, imported] = await Promise.all([
+    getCalendarConnection(),
+    supabase.from("events").select("id", { count: "exact", head: true }).eq("source", IMPORT_SOURCE),
+  ]);
 
   return (
     <main className="main main-narrow" style={{ gap: 28 }}>
@@ -70,6 +81,13 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      <CalendarConnect
+        connected={connection?.status === "connected"}
+        label={connection?.label ?? null}
+        syncedLabel={connection?.lastSyncedAt ? formatShortDate(new Date(connection.lastSyncedAt).getTime()) : null}
+        importedCount={imported.count ?? 0}
+      />
+
       <CanvasConnect />
 
       <section style={{ display: "flex", flexDirection: "column", gap: 10 }} aria-label="School and Google">
@@ -84,7 +102,7 @@ export default function SettingsPage() {
 
       <section style={{ display: "flex", flexDirection: "column", gap: 10 }} aria-label="AI models">
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-          <h2 className="section-label">Free AI models · tried in this order</h2>
+          <h2 className="section-label">Free AI models · Auto tries them in this order</h2>
           <span className="list-desc">Keys live in Vercel → Settings → Environment Variables, never on this page</span>
         </div>
         <div className="list-card">

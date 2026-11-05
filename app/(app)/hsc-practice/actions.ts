@@ -1,12 +1,14 @@
 "use server";
 
+import { randomInt } from "node:crypto";
+import { revalidatePath } from "next/cache";
 import {
   aiChat,
   aiErrorMessage,
   fallbackNote,
   type AiContentPart,
 } from "@/lib/ai";
-import { revalidatePath } from "next/cache";
+import { bandGuide, LETTERS, type BandLevel, type Mcq } from "@/lib/hsc";
 import { parseMarking, type DraftCard, type ParsedMarking } from "@/lib/marking";
 import { createClient, isSignedIn } from "@/lib/supabase/server";
 
@@ -16,7 +18,19 @@ Write maths the way you'd type it, using characters like x², √(x), π, θ, �
 const QUESTION_SYSTEM = `You write practice questions in the authentic style of NSW HSC exams.
 Match the real exam: use HSC command terms (Explain, Analyse, Calculate, Assess, Describe, etc.),
 realistic wording, and a clear mark allocation. If the question has parts, label them (a), (b), ...
+Write an original question: never copy a real past paper.
 Output ONLY the question and its marks — never the answer or any hints.
+${PLAIN_MATHS}`;
+
+const MCQ_SYSTEM = `You write original multiple-choice questions in the style of Section I of NSW HSC exams.
+Each question has exactly four options and exactly one correct answer. Make the wrong options plausible:
+base them on mistakes students really make. Check the correct answer yourself before you reply.
+Never copy a real past paper.
+
+Reply with JSON only, no other text, in exactly this shape:
+{"questions":[{"question":"...","options":["...","...","...","..."],"answer":"A","explanation":"..."}]}
+"answer" is the letter of the correct option. "explanation" says why it's right and why the most tempting
+wrong option is wrong, in two or three sentences. Don't put letters in front of the options.
 ${PLAIN_MATHS}`;
 
 const MARK_SYSTEM = `You mark a student's NSW HSC practice answer the way a NESA marker would.
@@ -51,13 +65,20 @@ ${PLAIN_MATHS}`;
 
 const MAX_QUESTION = 6_000;
 const MAX_ANSWER = 20_000;
+const MAX_TOPIC = 120;
 // A drawing arrives as base64 text. Keep this under bodySizeLimit in next.config.mjs.
 const MAX_IMAGE = 3_500_000;
 const IMAGE_FORMAT = /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/]+=*$/;
+const BANDS: BandLevel[] = ["any", "3", "4", "5", "6"];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const SIGNED_OUT = "You've been signed out. Refresh the page and sign in again.";
 
 export type QuestionReply = { ok: boolean; text: string; note?: string; model?: string };
+
+export type McqReply =
+  | { ok: false; text: string }
+  | { ok: true; questions: Mcq[]; model: string; note?: string };
 
 export type MarkReply =
   | { ok: false; text: string }
@@ -70,12 +91,134 @@ export type MarkReply =
       cardsFailed: boolean;
     };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function cleanBand(band: string): BandLevel {
+  return BANDS.includes(band as BandLevel) ? (band as BandLevel) : "any";
+}
 
-// Saves the marker's flashcards. Marking the same question again replaces the cards
-// from the last attempt, so resubmitting doesn't pile up duplicates. New cards go in
-// first, so a failure can't lose the old ones. A failure here must never lose the
-// marking itself, so this reports null rather than throwing.
+function onTopic(topic: string): string {
+  const t = topic.trim().slice(0, MAX_TOPIC);
+  return t ? ` on the topic "${t}"` : "";
+}
+
+export async function generateQuestion(input: {
+  course: string;
+  topic: string;
+  marks: string;
+  band: string;
+  model?: string;
+}): Promise<QuestionReply> {
+  const { course, topic, marks, model } = input;
+  if (!course) return { ok: false, text: "Pick a subject first." };
+  if (!(await isSignedIn())) return { ok: false, text: SIGNED_OUT };
+
+  try {
+    const res = await aiChat(
+      [
+        {
+          role: "user",
+          content: `Write one HSC-style ${course} question${onTopic(topic)}, worth ${marks || "a few"} marks. Make it ${bandGuide(course, cleanBand(input.band))}.`,
+        },
+      ],
+      { system: QUESTION_SYSTEM, temperature: 0.7, model },
+    );
+    return { ok: true, text: res.text, model: res.modelLabel, note: fallbackNote(model, res) };
+  } catch (err) {
+    return { ok: false, text: aiErrorMessage(err) };
+  }
+}
+
+// Pulls the JSON out of a reply, even if the model wrapped it in a code block or
+// added a sentence around it.
+function readJson(text: string): unknown {
+  const unfenced = text.replace(/```(?:json)?/gi, "");
+  const start = unfenced.search(/[[{]/);
+  const end = Math.max(unfenced.lastIndexOf("}"), unfenced.lastIndexOf("]"));
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(unfenced.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+function toMcqs(data: unknown): Mcq[] {
+  const list = Array.isArray(data)
+    ? data
+    : data && typeof data === "object" && Array.isArray((data as { questions?: unknown }).questions)
+      ? (data as { questions: unknown[] }).questions
+      : [];
+
+  const out: Mcq[] = [];
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const q = item as Record<string, unknown>;
+    const question = typeof q.question === "string" ? q.question.trim() : "";
+    const options = Array.isArray(q.options)
+      ? q.options.map((o) => (typeof o === "string" ? o.replace(/^\s*\(?[A-D][).:]\s+/, "").trim() : ""))
+      : [];
+    const raw = typeof q.answer === "number" ? LETTERS[q.answer] : String(q.answer ?? "").trim().toUpperCase();
+    const answer = LETTERS.indexOf(raw.charAt(0));
+    const explanation = typeof q.explanation === "string" ? q.explanation.trim() : "";
+
+    if (!question || question.length > 2000) continue;
+    if (options.length !== 4 || options.some((o) => !o || o.length > 500)) continue;
+    if (answer < 0) continue;
+
+    // Shuffle, so the right answer isn't always in the same place.
+    const order = [0, 1, 2, 3];
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = randomInt(i + 1);
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    out.push({
+      question,
+      options: order.map((i) => options[i]),
+      answer: order.indexOf(answer),
+      explanation: explanation.slice(0, 2000),
+    });
+  }
+  return out;
+}
+
+export async function generateMcqs(input: {
+  course: string;
+  topic: string;
+  band: string;
+  count: number;
+  model?: string;
+}): Promise<McqReply> {
+  const { course, topic, model } = input;
+  const count = Math.min(10, Math.max(1, Math.round(input.count) || 5));
+  if (!course) return { ok: false, text: "Pick a subject first." };
+  if (!(await isSignedIn())) return { ok: false, text: SIGNED_OUT };
+
+  try {
+    const res = await aiChat(
+      [
+        {
+          role: "user",
+          content: `Write ${count} HSC-style ${course} multiple-choice questions${onTopic(topic)}. Make each ${bandGuide(course, cleanBand(input.band))}. Cover different ideas in each question.`,
+        },
+      ],
+      { system: MCQ_SYSTEM, temperature: 0.7, model },
+    );
+    const questions = toMcqs(readJson(res.text)).slice(0, count);
+    if (questions.length === 0) {
+      return {
+        ok: false,
+        text: `${res.modelLabel} sent its questions back in the wrong format. Try again, or pick a different model.`,
+      };
+    }
+    return { ok: true, questions, model: res.modelLabel, note: fallbackNote(model, res) };
+  } catch (err) {
+    return { ok: false, text: aiErrorMessage(err) };
+  }
+}
+
+// Saves flashcards. Replacing `replaceIds` lets a resubmitted answer swap its old
+// cards for new ones rather than piling up duplicates. New cards go in first, so a
+// failure can't lose the old ones. Reports null rather than throwing, because a
+// failure here must never lose the marking itself.
 async function saveCards(
   cards: DraftCard[],
   course: string,
@@ -92,7 +235,7 @@ async function saveCards(
         .insert(
           cards.map((c) => ({
             course: course || null,
-            topic: topic.trim().slice(0, 120) || null,
+            topic: topic.trim().slice(0, MAX_TOPIC) || null,
             front: c.front,
             back: c.back,
             due_at: new Date().toISOString(),
@@ -100,7 +243,7 @@ async function saveCards(
         )
         .select("id");
       if (error || !data) return null;
-      ids = data.map((row) => row.id as string);
+      ids = data.map((row: { id: string }) => row.id);
     }
 
     const old = replaceIds.filter((id) => UUID.test(id)).slice(0, 10);
@@ -113,30 +256,25 @@ async function saveCards(
   }
 }
 
-export async function generateQuestion(
-  course: string,
-  topic: string,
-  marks: string,
-  model?: string,
-): Promise<QuestionReply> {
-  if (!course) return { ok: false, text: "Pick a subject first." };
-  if (!(await isSignedIn())) return { ok: false, text: SIGNED_OUT };
+// Turns the multiple-choice questions you got wrong into flashcards.
+export async function saveMcqMistakes(input: {
+  course: string;
+  topic: string;
+  mistakes: Mcq[];
+}): Promise<{ ok: boolean; count: number }> {
+  if (!(await isSignedIn())) return { ok: false, count: 0 };
 
-  try {
-    const onTopic = topic.trim() ? ` on the topic "${topic.trim().slice(0, 120)}"` : "";
-    const res = await aiChat(
-      [
-        {
-          role: "user",
-          content: `Write one HSC-style ${course} question${onTopic}, worth ${marks || "a few"} marks.`,
-        },
-      ],
-      { system: QUESTION_SYSTEM, temperature: 0.7, model },
-    );
-    return { ok: true, text: res.text, model: res.modelLabel, note: fallbackNote(model, res) };
-  } catch (err) {
-    return { ok: false, text: aiErrorMessage(err) };
-  }
+  const cards: DraftCard[] = input.mistakes
+    .slice(0, 10)
+    .filter((m) => m.options.length === 4 && m.answer >= 0 && m.answer < 4)
+    .map((m) => ({
+      front: `${m.question}\n\n${m.options.map((o, i) => `${LETTERS[i]}) ${o}`).join("\n")}`.slice(0, 2500),
+      back: `${LETTERS[m.answer]}) ${m.options[m.answer]}${m.explanation ? `\n\n${m.explanation}` : ""}`.slice(0, 2500),
+    }));
+  if (cards.length === 0) return { ok: true, count: 0 };
+
+  const ids = await saveCards(cards, input.course, input.topic, []);
+  return { ok: ids !== null, count: ids?.length ?? 0 };
 }
 
 export async function markAnswer(input: {

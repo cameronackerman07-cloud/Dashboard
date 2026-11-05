@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
+import { COURSES } from "@/lib/nav";
 import { createClient } from "@/lib/supabase/server";
 import { FlashcardsClient, type Card } from "./FlashcardsClient";
 
@@ -20,9 +21,9 @@ export default async function FlashcardsPage() {
       <PageHeader
         icon="cards"
         title="Flashcards"
-        lede="What you got wrong in HSC practice, ready to review. Cards you struggle with come back sooner."
+        lede="Your own cards, plus what you got wrong in HSC practice. Cards you struggle with come back sooner."
       />
-      <FlashcardsClient cards={cards} now={Date.now()} />
+      <FlashcardsClient cards={cards} now={Date.now()} courses={COURSES} />
     </main>
   );
 }

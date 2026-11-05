@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Icon } from "@/components/Icon";
 import { intervalLabel, nextReview, type Rating } from "@/lib/flashcards";
-import { deleteCard, reviewCard } from "./actions";
+import { createCard, deleteCard, reviewCard } from "./actions";
 
 export type Card = {
   id: string;
@@ -37,8 +37,19 @@ function dueLabel(card: Card, now: number) {
   return days <= 1 ? "Due within a day" : `Due in ${days} days`;
 }
 
-export function FlashcardsClient({ cards: initial, now }: { cards: Card[]; now: number }) {
+export function FlashcardsClient({
+  cards: initial,
+  now,
+  courses: allCourses,
+}: {
+  cards: Card[];
+  now: number;
+  courses: string[];
+}) {
   const [, startTransition] = useTransition();
+  const [adding, startAdding] = useTransition();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [addStatus, setAddStatus] = useState("");
   const [cards, setCards] = useState(initial);
   const [queue, setQueue] = useState(() => initial.filter((c) => isDue(c, now)).map((c) => c.id));
   const [revealed, setRevealed] = useState(false);
@@ -91,15 +102,96 @@ export function FlashcardsClient({ cards: initial, now }: { cards: Card[]; now: 
     });
   }
 
+  function add(formData: FormData) {
+    const card = {
+      course: String(formData.get("course") ?? "") || null,
+      topic: String(formData.get("topic") ?? "").trim() || null,
+      front: String(formData.get("front") ?? "").trim(),
+      back: String(formData.get("back") ?? "").trim(),
+    };
+    if (!card.front || !card.back) {
+      setAddStatus("Fill in both the question and the answer.");
+      return;
+    }
+    setAddStatus("");
+    startAdding(async () => {
+      let saved: Awaited<ReturnType<typeof createCard>> = null;
+      try {
+        saved = await createCard(card);
+      } catch {
+        // Handled below, the same as the server saying no.
+      }
+      if (!saved) {
+        setAddStatus("That card couldn't be saved. Check your connection and try again.");
+        return;
+      }
+      const created: Card = { ...card, id: saved.id, due_at: saved.due_at, interval_days: 0, ease: 2.5 };
+      setCards((all) => [created, ...all]);
+      setQueue((ids) => [...ids, created.id]);
+      formRef.current?.reset();
+      setAddStatus("Added. It's in your review pile now.");
+    });
+  }
+
+  const addForm = (
+    <section className="card" aria-label="Make a flashcard">
+      <h2 className="card-title">Make a flashcard</h2>
+      <form ref={formRef} action={add} className="track-form">
+        <div className="track-fields">
+          <select name="course" className="input" aria-label="Subject" defaultValue="">
+            <option value="">No subject</option>
+            {allCourses.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <input name="topic" className="input" placeholder="Topic (optional)" aria-label="Topic" maxLength={120} />
+        </div>
+        <textarea
+          name="front"
+          className="input"
+          placeholder="Question (front of the card)"
+          aria-label="Question"
+          rows={3}
+          maxLength={2500}
+          required
+        />
+        <textarea
+          name="back"
+          className="input"
+          placeholder="Answer (back of the card)"
+          aria-label="Answer"
+          rows={3}
+          maxLength={2500}
+          required
+        />
+        <div className="note-actions">
+          <button type="submit" className="btn btn-dark" disabled={adding}>
+            {adding ? "Adding…" : "Add card"}
+          </button>
+          {addStatus ? (
+            <span className="card-meta" role="status">
+              {addStatus}
+            </span>
+          ) : null}
+        </div>
+      </form>
+    </section>
+  );
+
   if (cards.length === 0) {
     return (
-      <section className="card" aria-label="No flashcards yet">
-        <h2 className="card-title">No flashcards yet</h2>
-        <p className="track-empty">
-          When you lose marks in <Link href="/hsc-practice">HSC practice</Link>, what you got wrong
-          turns into flashcards here automatically.
-        </p>
-      </section>
+      <>
+        <section className="card" aria-label="No flashcards yet">
+          <h2 className="card-title">No flashcards yet</h2>
+          <p className="track-empty">
+            Make your own below. When you lose marks in <Link href="/hsc-practice">HSC practice</Link>,
+            what you got wrong turns into flashcards here automatically too.
+          </p>
+        </section>
+        {addForm}
+      </>
     );
   }
 
@@ -167,6 +259,8 @@ export function FlashcardsClient({ cards: initial, now }: { cards: Card[]; now: 
           </p>
         ) : null}
       </section>
+
+      {addForm}
 
       <section className="card" aria-label="All flashcards">
         <div className="card-head">
