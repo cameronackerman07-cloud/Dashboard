@@ -52,6 +52,7 @@ export const NAV: NavGroup[] = [
         icon: "timetable",
         blurb: "Classes, rooms and what's next",
         phase: 1,
+        built: true,
         plans: [
           "Pulls your classes from Atlantis Timetable",
           "Highlights the class that's on now and the next one",
@@ -85,6 +86,7 @@ export const NAV: NavGroup[] = [
         icon: "hsc",
         blurb: "HSC-style questions with AI marking",
         phase: 2,
+        built: true,
         plans: [
           "Pick a course and syllabus topic, get a new HSC-style question",
           "Links each topic to NESA past papers and marking guidelines",
@@ -112,6 +114,7 @@ export const NAV: NavGroup[] = [
         icon: "planner",
         blurb: "A weekly plan built around your life",
         phase: 2,
+        built: true,
         plans: [
           "Builds study blocks around classes, shifts and sport",
           "Moves things automatically when a new task appears",
@@ -130,6 +133,7 @@ export const NAV: NavGroup[] = [
         icon: "tutor",
         blurb: "Hints first, full answers when you ask",
         phase: 3,
+        built: true,
         plans: [
           "Chat about any of your seven courses",
           "Gives hints first, then the full worked solution if you ask",
@@ -144,6 +148,7 @@ export const NAV: NavGroup[] = [
         icon: "summaries",
         blurb: "Notes, PDFs and photos, summarised",
         phase: 3,
+        built: true,
         plans: [
           "Upload notes, worksheets or textbook pages",
           "Get a short summary and key points",
@@ -162,6 +167,7 @@ export const NAV: NavGroup[] = [
         icon: "notes",
         blurb: "Quick notes, synced everywhere",
         phase: 4,
+        built: true,
         plans: ["Quick notes on any device", "Search across notes and school work"],
       },
       {

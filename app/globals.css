@@ -315,6 +315,50 @@ select.input { appearance: none; -webkit-appearance: none; cursor: pointer; padd
 .task-del:hover { background: var(--hover); color: var(--ink); }
 .track-empty { font-size: 14px; color: var(--muted); line-height: 1.5; }
 
+/* ---------- Timetable & planner grids ---------- */
+.tt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; align-items: start; }
+.tt-col { padding: 16px; gap: 10px; }
+.tt-today { border-color: var(--ink); }
+.tt-list { display: flex; flex-direction: column; }
+.tt-item { display: flex; align-items: center; gap: 10px; min-height: 48px; border-bottom: 1px solid var(--line-soft); }
+.tt-item:last-child { border-bottom: 0; }
+
+/* ---------- Notes ---------- */
+.notes-layout { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 16px; align-items: start; }
+.notes-list { gap: 12px; position: sticky; top: 20px; }
+.note-rows { display: flex; flex-direction: column; }
+.note-row { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left; padding: 10px; border: 0; border-bottom: 1px solid var(--line-soft); background: transparent; cursor: pointer; border-radius: 8px; color: var(--ink); }
+.note-row:last-child { border-bottom: 0; }
+.note-row:hover { background: var(--hover); }
+.note-row.is-active { background: var(--ink); color: #fff; }
+.note-row-title { font-size: 14px; font-weight: 600; }
+.note-row-sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.note-row.is-active .note-row-sub { color: #d6d6d6; }
+.notes-editor { gap: 12px; }
+.note-edit { display: flex; flex-direction: column; gap: 12px; }
+.note-title { font-weight: 700; }
+.note-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+textarea.input { height: auto; padding-top: 12px; padding-bottom: 12px; line-height: 1.5; resize: vertical; }
+.note-body { min-height: 300px; }
+
+/* ---------- Chat (AI tutor) ---------- */
+.chat { gap: 16px; }
+.chat-log { display: flex; flex-direction: column; gap: 12px; min-height: 280px; }
+.bubble { display: flex; flex-direction: column; gap: 4px; max-width: 85%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); }
+.bubble-user { align-self: flex-end; background: var(--ink); color: #fff; border-color: var(--ink); }
+.bubble-assistant { align-self: flex-start; background: var(--surface-2); }
+.bubble-who { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.7; }
+.bubble-text { font-size: 15px; line-height: 1.55; white-space: pre-wrap; }
+.chat-input { display: flex; gap: 10px; align-items: flex-end; }
+.chat-box { flex: 1; min-height: 52px; }
+
+@media (max-width: 760px) {
+  .notes-layout { grid-template-columns: 1fr; }
+  .notes-list { position: static; }
+  .bubble { max-width: 100%; }
+}
+
 /* ---------- Sign-in page (Option A: black on white) ---------- */
 .auth {
   min-height: 100vh; min-height: 100dvh;

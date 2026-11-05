@@ -30,8 +30,15 @@ Read this before every task. Keep it up to date when decisions change.
   route group — it does not appear in the URL, so `app/(app)/page.tsx` is still `/`.
 - `app/(app)/page.tsx` — Home. `lib/sample.ts` holds sample data; replace each block with live data
   and delete the sample when done.
-- `app/(app)/[section]/page.tsx` — placeholder page for every sidebar item. When building a real
-  page, create `app/(app)/<slug>/page.tsx`; it overrides the placeholder automatically.
+- `app/(app)/[section]/page.tsx` — placeholder page for every sidebar item that isn't built yet.
+  When you build a real page, create `app/(app)/<slug>/page.tsx` AND set `built: true` on that item
+  in `lib/nav.ts` (the placeholder skips built slugs in `generateStaticParams`, so they don't clash).
+- Built pages so far: `assignments` (due-date tracker), `timetable`, `notes`, `planner`,
+  `hsc-practice`, `tutor`, `summaries`. Each has `page.tsx` (server, fetches data), usually a
+  `*Client.tsx` (interactivity, optimistic updates) and `actions.ts` (server actions, RLS-scoped).
+- `components/PageHeader.tsx` — shared breadcrumb + icon + title + lede for built pages.
+- `components/DueSoon.tsx` — Home's live "Due soon" card. `lib/tasks.ts` — shared task shape +
+  `formatDue` (pass `now` only after mount to avoid hydration mismatches).
 - `app/(app)/settings/page.tsx` + `components/CanvasConnect.tsx` — Connections screen.
 - `app/privacy/page.tsx`, `app/terms/page.tsx` — public legal pages (outside `(app)`, no sidebar,
   no login) for Google's OAuth consent screen. Keep them reachable while signed out.
@@ -45,8 +52,14 @@ Read this before every task. Keep it up to date when decisions change.
   `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (mapped in `next.config.mjs`).
 - Sign-in page: `app/login/page.tsx`. Magic-link lands on `app/auth/confirm/route.ts`; sign-out is
   `app/auth/signout/route.ts`.
-- SQL schema + RLS: `supabase/migrations/`. See `SETUP.md` for the one-time dashboard steps.
+- SQL schema + RLS: `supabase/migrations/`. `0001_init.sql` (profiles, connections, tasks, events,
+  flashcards); `0002_phase1_more.sql` (timetable, notes, study_blocks). Run each in the Supabase SQL
+  editor. See `SETUP.md` for the one-time dashboard steps.
 - `lib/crypto.ts` — AES-256-GCM encrypt/decrypt for saved tokens, server-only (`TOKEN_ENCRYPTION_KEY`).
+- `lib/ai.ts` — server-only AI router (`aiChat`, `aiConfigured`). Tries free OpenAI-compatible
+  providers in order from whichever keys are set (GEMINI/GROQ/OPENROUTER/MISTRAL). AI pages
+  (`tutor`, `summaries`, `hsc-practice`) are `force-dynamic` and show `components/AiNotice.tsx`
+  until a key is added. Only send school content to models — never names, emails or tokens.
 
 ## Secrets — non-negotiable
 - API keys and tokens live ONLY in Vercel → Settings → Environment Variables (and `.env.local` for

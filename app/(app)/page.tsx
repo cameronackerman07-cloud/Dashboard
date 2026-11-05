@@ -1,10 +1,22 @@
 import Link from "next/link";
+import { DueSoon } from "@/components/DueSoon";
 import { Greeting } from "@/components/Greeting";
 import { Icon } from "@/components/Icon";
-import { TaskList } from "@/components/TaskList";
-import { SAMPLE_HABITS, SAMPLE_PERIODS, SAMPLE_TASKS } from "@/lib/sample";
+import { createClient } from "@/lib/supabase/server";
+import { SAMPLE_HABITS, SAMPLE_PERIODS } from "@/lib/sample";
+import type { DbTask } from "@/lib/tasks";
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("tasks")
+    .select("id, title, course, source, due_at, done")
+    .eq("done", false)
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true })
+    .limit(5);
+  const dueSoon: DbTask[] = data ?? [];
+
   return (
     <main className="main">
       <div className="page-head">
@@ -76,7 +88,7 @@ export default function Home() {
               All tasks
             </Link>
           </div>
-          <TaskList tasks={SAMPLE_TASKS} />
+          <DueSoon tasks={dueSoon} />
         </section>
 
         <section className="card" aria-label="Countdowns">

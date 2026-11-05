@@ -12,13 +12,6 @@ export const SAMPLE_PERIODS = [
   { slot: "Period 5", name: "VET Entertainment" },
 ];
 
-export const SAMPLE_TASKS = [
-  { id: "t1", title: "Practice set", subject: "Maths Advanced", source: "Canvas", due: "Thu" },
-  { id: "t2", title: "Engineering report", subject: "Engineering Studies", source: "Canvas", due: "Fri" },
-  { id: "t3", title: "Essay draft", subject: "English Standard", source: "Compass", due: "Mon" },
-  { id: "t4", title: "Depth study proposal", subject: "Physics", source: "Google Classroom", due: "Next wk" },
-];
-
 export const SAMPLE_HABITS = [
   { name: "Study 1 hr", done: 2 },
   { name: "Sleep by 10:30", done: 1 },

@@ -1,17 +1,11 @@
 "use client";
 
-import { useOptimistic, useRef, useTransition } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { Icon } from "@/components/Icon";
+import { formatDue, type DbTask } from "@/lib/tasks";
 import { addTask, deleteTask, setTaskDone } from "./actions";
 
-export type Task = {
-  id: string;
-  title: string;
-  course: string | null;
-  source: string | null;
-  due_at: string | null;
-  done: boolean;
-};
+export type Task = DbTask;
 
 type Optimistic =
   | { type: "add"; task: Task }
@@ -29,31 +23,11 @@ function sortTasks(list: Task[]) {
   });
 }
 
-// Friendly, colour-free due label relative to today (in the viewer's timezone).
-function dueLabel(dueAt: string | null): { text: string; overdue: boolean } {
-  if (!dueAt) return { text: "No date", overdue: false };
-  const due = new Date(dueAt);
-  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const days = Math.round(
-    (startOfDay(due).getTime() - startOfDay(new Date()).getTime()) / 86_400_000,
-  );
-
-  if (days < 0) {
-    const text =
-      days === -1
-        ? "Yesterday"
-        : due.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-    return { text, overdue: true };
-  }
-  if (days === 0) return { text: "Today", overdue: false };
-  if (days === 1) return { text: "Tomorrow", overdue: false };
-  if (days < 7) return { text: due.toLocaleDateString(undefined, { weekday: "long" }), overdue: false };
-  return { text: due.toLocaleDateString(undefined, { day: "numeric", month: "short" }), overdue: false };
-}
-
 export function AssignmentsClient({ tasks, courses }: { tasks: Task[]; courses: string[] }) {
   const [, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => setNow(Date.now()), []);
 
   const [optimisticTasks, applyOptimistic] = useOptimistic(
     tasks,
@@ -160,7 +134,7 @@ export function AssignmentsClient({ tasks, courses }: { tasks: Task[]; courses: 
         ) : (
           <div className="track-list">
             {optimisticTasks.map((task) => {
-              const { text, overdue } = dueLabel(task.due_at);
+              const { text, overdue } = formatDue(task.due_at, { now });
               const sub = [task.course, task.source === "manual" ? null : task.source]
                 .filter(Boolean)
                 .join(" · ");

@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
-import { SAMPLE_TASKS } from "@/lib/sample";
 import { createClient } from "@/lib/supabase/server";
 
 // Layout for every signed-in page. The middleware already gates access, but we
@@ -14,9 +13,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!user) redirect("/login");
 
+  // Badge the Assignments nav item with the number of tasks still to do.
+  const { count } = await supabase
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("done", false);
+
   return (
     <div className="shell">
-      <Sidebar badges={{ assignments: SAMPLE_TASKS.length }} userEmail={user.email ?? ""} />
+      <Sidebar badges={{ assignments: count ?? 0 }} userEmail={user.email ?? ""} />
       {children}
     </div>
   );

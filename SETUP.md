@@ -14,10 +14,14 @@ Do these once. They're all in web dashboards — no coding. Follow them top to b
 2. Open the file [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql) in this repo,
    copy **everything**, and paste it into the editor.
 3. Click **Run** (bottom right). You should see "Success. No rows returned".
-4. Check **Table Editor** — you should now see `profiles`, `connections`, `tasks`,
-   `events` and `flashcards`. Each one has the shield icon meaning Row Level Security is on.
+4. Open a **New query** again and do the same with
+   [`supabase/migrations/0002_phase1_more.sql`](supabase/migrations/0002_phase1_more.sql), then **Run**.
+5. Check **Table Editor** — you should now see `profiles`, `connections`, `tasks`,
+   `events`, `flashcards`, `timetable`, `notes` and `study_blocks`. Each one has the shield
+   icon meaning Row Level Security is on.
 
-> Re-running the file later is safe — it won't duplicate anything.
+> Re-running these files later is safe — they won't duplicate anything. Run each new
+> `supabase/migrations/*.sql` file the same way whenever one is added.
 
 ## 3. Turn on email magic-link login
 1. Open **Authentication → Sign In / Providers → Email**.
@@ -67,3 +71,18 @@ and publishable key. The `TOKEN_ENCRYPTION_KEY` is already filled in. Then run `
 The site only lets in accounts you add. In **Authentication → Users → Add user →
 Create new user**, add your email (or just sign in once with your email and approve
 the magic link). After that, open the site, enter your email, and click the link.
+
+## 8. (Optional) Switch on the AI features
+The **AI tutor**, **Summaries** and **HSC practice** marking need a free AI key. Add **any one**
+of these in **Vercel → Settings → Environment Variables** (Production, Preview, Development),
+then **redeploy**. The app tries whichever keys are present, in this order:
+
+| Name | Get a free key at |
+|------|-------------------|
+| `GROQ_API_KEY` | <https://console.groq.com> (fastest to set up) |
+| `GEMINI_API_KEY` | <https://aistudio.google.com> |
+| `OPENROUTER_API_KEY` | <https://openrouter.ai> |
+| `MISTRAL_API_KEY` | <https://console.mistral.ai> |
+
+Until a key is added, those three pages show a short "add a key" note. Everything else
+(Timetable, Notes, Study planner, Assignments) works without any AI key.
