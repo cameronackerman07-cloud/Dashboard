@@ -34,7 +34,7 @@ Read this before every task. Keep it up to date when decisions change.
   When you build a real page, create `app/(app)/<slug>/page.tsx` AND set `built: true` on that item
   in `lib/nav.ts` (the placeholder skips built slugs in `generateStaticParams`, so they don't clash).
 - Built pages so far: `assignments` (due-date tracker), `timetable`, `notes`, `planner`,
-  `hsc-practice`, `tutor`, `summaries`. Each has `page.tsx` (server, fetches data), usually a
+  `hsc-practice`, `tutor`, `summaries`, `flashcards`. Each has `page.tsx` (server, fetches data), usually a
   `*Client.tsx` (interactivity, optimistic updates) and `actions.ts` (server actions, RLS-scoped).
 - `components/PageHeader.tsx` — shared breadcrumb + icon + title + lede for built pages.
 - `components/DueSoon.tsx` — Home's live "Due soon" card. `lib/tasks.ts` — shared task shape +
@@ -64,8 +64,14 @@ Read this before every task. Keep it up to date when decisions change.
   Only send school content to models — never names, emails or tokens.
 - `components/ModelPicker.tsx` — the model dropdown and `useAiModel` (saved per device in
   localStorage). A pick that fails falls back to the next model, and the page says so.
-- `components/DrawingPad.tsx` — handwriting canvas; exports a white-background JPEG. `lib/marking.ts`
-  splits the marker's reply into sections. Drawings need a model with `vision: true`.
+- `components/DrawingPad.tsx` — handwriting canvas (pen tips, sizes, colours, straighten); exports a
+  white-background JPEG. Pen colours are the one exception to the no-colour rule, because they're the
+  student's own ink. Drawings need a model with `vision: true`.
+- `components/RichTextEditor.tsx` — formatted typed answers, built on the browser's editing commands.
+  Formatting is display-only: `toPlainText` sends text with `^`, `_` and `#` to the AI. Paste is
+  plain text only, and the HTML is never saved.
+- `lib/marking.ts` splits the marker's reply into sections and flashcards. `markAnswer` saves the
+  flashcards automatically; `lib/flashcards.ts` schedules reviews, shown on `app/(app)/flashcards`.
 
 ## Secrets — non-negotiable
 - API keys and tokens live ONLY in Vercel → Settings → Environment Variables (and `.env.local` for

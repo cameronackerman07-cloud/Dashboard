@@ -99,8 +99,9 @@ export const NAV: NavGroup[] = [
         label: "Flashcards",
         short: "Cards",
         icon: "cards",
-        blurb: "Made from your notes, spaced for memory",
+        blurb: "Review what you got wrong, spaced for memory",
         phase: 2,
+        built: true,
         plans: [
           "Turns uploaded notes, PDFs and photos into flashcards",
           "Spaced repetition: cards you get wrong come back sooner",

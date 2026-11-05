@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { DrawingPad, type DrawingPadHandle } from "@/components/DrawingPad";
 import { Icon } from "@/components/Icon";
 import { ModelPicker, useAiModel } from "@/components/ModelPicker";
+import { RichTextEditor, type RichTextHandle } from "@/components/RichTextEditor";
 import type { AiModelOption } from "@/lib/ai";
 import type { ParsedMarking } from "@/lib/marking";
 import { generateQuestion, markAnswer } from "./actions";
@@ -38,16 +40,19 @@ export function PracticeClient({
 
   // The subject is kept with the question, so changing the dropdown afterwards
   // can't mark this answer as if it were a different subject.
-  const [question, setQuestion] = useState<{ text: string; course: string } | null>(null);
+  const [question, setQuestion] = useState<{ text: string; course: string; topic: string } | null>(null);
   const [questionMeta, setQuestionMeta] = useState("");
 
   const [mode, setMode] = useState<"type" | "draw">("type");
   const [answer, setAnswer] = useState("");
   const [hasInk, setHasInk] = useState(false);
   const padRef = useRef<DrawingPadHandle>(null);
+  const editorRef = useRef<RichTextHandle>(null);
 
-  const [marking, setMarking] = useState<ParsedMarking | null>(null);
+  const [marking, setMarking] = useState<Omit<ParsedMarking, "cards"> | null>(null);
   const [markingMeta, setMarkingMeta] = useState("");
+  const [cardIds, setCardIds] = useState<string[]>([]);
+  const [cardsFailed, setCardsFailed] = useState(false);
   const [status, setStatus] = useState("");
   const [submitStatus, setSubmitStatus] = useState("");
 
@@ -58,9 +63,12 @@ export function PracticeClient({
     setAnswer("");
     setHasInk(false);
     padRef.current?.clear();
+    editorRef.current?.clear();
     setMarking(null);
     setMarkingMeta("");
     setSubmitStatus("");
+    setCardIds([]); // a new question keeps the old question's cards
+    setCardsFailed(false);
   }
 
   function generate() {
@@ -74,7 +82,7 @@ export function PracticeClient({
       try {
         const res = await generateQuestion(course, topic, marks, model);
         if (res.ok) {
-          setQuestion({ text: res.text, course });
+          setQuestion({ text: res.text, course, topic });
           setQuestionMeta(res.note ?? `Written by ${res.model}`);
         } else {
           setStatus(res.text);
@@ -105,10 +113,14 @@ export function PracticeClient({
           answer,
           image,
           model,
+          topic: question.topic,
+          replaceCardIds: cardIds,
         });
         if (res.ok) {
           setMarking(res.marking);
           setMarkingMeta(res.note ?? `Marked by ${res.model}.`);
+          setCardsFailed(res.cardsFailed);
+          if (!res.cardsFailed) setCardIds(res.cardIds);
         } else {
           setSubmitStatus(res.text);
         }
@@ -189,13 +201,11 @@ export function PracticeClient({
 
           {/* Both stay mounted, so switching tabs never loses your work. */}
           <div hidden={mode !== "type"}>
-            <textarea
-              className="input note-body answer-box"
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
+            <RichTextEditor
+              ref={editorRef}
+              onChange={setAnswer}
               placeholder="Type your answer and working…"
-              aria-label="Your answer"
-              rows={8}
+              ariaLabel="Your answer"
             />
           </div>
           <div hidden={mode !== "draw"}>
@@ -242,6 +252,16 @@ export function PracticeClient({
               </div>
             ))}
           </div>
+          {cardsFailed ? (
+            <p className="ai-error" role="alert">
+              Your marking is fine, but the flashcards couldn&apos;t be saved. Submit again to retry.
+            </p>
+          ) : cardIds.length > 0 ? (
+            <p className="mark-cards">
+              Added {cardIds.length === 1 ? "1 flashcard" : `${cardIds.length} flashcards`} from your
+              mistakes. <Link href="/flashcards">Review flashcards</Link>
+            </p>
+          ) : null}
           <span className="card-meta">
             {markingMeta} AI marking can get things wrong, so check anything surprising with your
             teacher or a NESA marking guideline.

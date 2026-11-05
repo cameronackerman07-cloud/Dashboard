@@ -368,11 +368,54 @@ textarea.input { height: auto; padding-top: 12px; padding-bottom: 12px; line-hei
 .seg-btn:hover { background: var(--hover); }
 .seg-btn.is-active { background: var(--ink); color: #fff; }
 .seg-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.answer-box { width: 100%; }
 [hidden] { display: none !important; }
 
+.tool-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tool-btn {
+  min-height: 44px; min-width: 44px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.tool-btn:hover { background: var(--hover); }
+.tool-btn.is-active { background: var(--ink); color: #fff; border-color: var(--ink); }
+.tool-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.tool-select { flex: 0 1 140px; min-width: 0; font-size: 13px; }
+
+/* Pen colours are the student's own ink, so they're the one place colour is allowed. */
+.swatch { width: 44px; height: 44px; padding: 0; border: 1px solid var(--line-strong); border-radius: 50%; cursor: pointer; }
+.swatch.is-active { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+.swatch-custom { position: relative; overflow: hidden; }
+.swatch-custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+
+/* Typed answers */
+.rte { display: flex; flex-direction: column; gap: 10px; }
+.rte-box { height: auto; min-height: 300px; padding: 12px 14px; line-height: 1.5; overflow-wrap: anywhere; cursor: text; }
+.rte-box.is-empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
+.rte-box h2 { font-size: 24px; line-height: 1.25; font-weight: 700; margin: 8px 0 4px; }
+.rte-box h3 { font-size: 18px; line-height: 1.3; font-weight: 700; margin: 6px 0 2px; }
+.rte-box b, .rte-box strong { font-weight: 700; }
+.rte-box i, .rte-box em { font-style: italic; }
+.rte-box u { text-decoration: underline; }
+.rte-box ul, .rte-box ol { margin: 4px 0; padding-left: 24px; }
+.rte-box ul { list-style: disc; }
+.rte-box ol { list-style: decimal; }
+.rte-b { font-weight: 800; }
+.rte-i { font-style: italic; }
+.rte-u { text-decoration: underline; }
+
+.mark-cards { font-size: 14px; font-weight: 500; line-height: 1.5; }
+.mark-cards a { text-decoration: underline; }
+
+/* ---------- Flashcards ---------- */
+.fc { display: flex; flex-direction: column; gap: 12px; }
+.fc-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fc-front { font-size: 18px; font-weight: 600; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fc-back { padding-top: 12px; border-top: 1px solid var(--line-soft); overflow-wrap: anywhere; }
+.fc-rates { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.fc-rate { flex-direction: column; gap: 2px; height: auto; min-height: 56px; padding: 8px 4px; }
+.fc-list-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .draw { display: flex; flex-direction: column; gap: 10px; }
-.draw-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .draw-canvas {
   display: block; width: 100%; cursor: crosshair;
   border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
@@ -387,6 +430,10 @@ textarea.input { height: auto; padding-top: 12px; padding-bottom: 12px; line-hei
 .mark-section { display: flex; flex-direction: column; gap: 6px; }
 
 @media (max-width: 760px) {
+  /* One scrolling line per tool row, so the writing area isn't pushed off the screen. */
+  .draw .tool-row { flex-wrap: nowrap; overflow-x: auto; padding: 4px; margin: -4px; scrollbar-width: none; }
+  .draw .tool-row::-webkit-scrollbar { display: none; }
+  .draw .tool-btn, .draw .swatch { flex: none; white-space: nowrap; }
   .notes-layout { grid-template-columns: 1fr; }
   .notes-list { position: static; }
   .bubble { max-width: 100%; }
