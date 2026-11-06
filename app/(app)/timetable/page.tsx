@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
-import { getCalendarConnection, loadEvents } from "@/lib/calendar";
+import { getCalendarConnections, loadEvents } from "@/lib/calendar";
 import { COURSES } from "@/lib/nav";
 import { createClient } from "@/lib/supabase/server";
 import { formatShortDate, formatTime, startOfDay, weekday } from "@/lib/time";
@@ -17,7 +17,7 @@ export default async function TimetablePage() {
   const monday = startOfDay(now, today >= 6 ? 8 - today : 1 - today);
   const saturday = startOfDay(monday, 5);
 
-  const [{ data }, { events, error }, connection] = await Promise.all([
+  const [{ data }, { events, error }, connections] = await Promise.all([
     supabase
       .from("timetable")
       .select("id, day_of_week, period, subject, room, week")
@@ -25,7 +25,7 @@ export default async function TimetablePage() {
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
     loadEvents(monday, saturday),
-    getCalendarConnection(),
+    getCalendarConnections(),
   ]);
 
   const classes: ClassRow[] = data ?? [];
@@ -55,9 +55,9 @@ export default async function TimetablePage() {
         icon="timetable"
         title="Timetable"
         lede={
-          connection || hasLinked
-            ? `Week of ${formatShortDate(monday)}, from your Sentral calendar, plus any classes you add by hand.`
-            : "Your weekly classes. Connect Sentral in Settings to fill this in automatically, or add classes by hand."
+          connections.length || hasLinked
+            ? `Week of ${formatShortDate(monday)}, from your ${connections.map((c) => c.name).join(" and ") || "linked"} ${connections.length > 1 ? "calendars" : "calendar"}, plus your own classes.`
+            : "Your weekly classes. Connect Sentral or Atlantis in Settings, paste your timetable in, or add classes by hand."
         }
       />
       <TimetableClient
@@ -65,7 +65,7 @@ export default async function TimetablePage() {
         courses={COURSES}
         linked={hasLinked ? linked : null}
         linkError={error}
-        connected={!!connection}
+        connected={connections.length > 0}
       />
     </main>
   );

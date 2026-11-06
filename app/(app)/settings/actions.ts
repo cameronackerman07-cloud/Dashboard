@@ -2,12 +2,26 @@
 
 import { revalidatePath } from "next/cache";
 import {
-  CALENDAR_PROVIDER,
+  CALENDAR_SOURCES,
   CalendarError,
   fetchCalendarText,
   IMPORT_SOURCE,
+  isCalendarSource,
   normaliseLink,
 } from "@/lib/calendar";
+import {
+  CANVAS_PROVIDER,
+  CANVAS_SOURCE,
+  CanvasError,
+  cleanToken,
+  errorText,
+  normaliseCanvasBase,
+  syncCanvas,
+  syncMessage,
+  syncWithConfig,
+  testCanvasToken,
+  type CanvasConfig,
+} from "@/lib/canvas";
 import { encryptToken } from "@/lib/crypto";
 import { eventsBetween, parseIcs } from "@/lib/ics";
 import { createClient } from "@/lib/supabase/server";
@@ -21,7 +35,7 @@ const MAX_IMPORT = 5_000;
 export type CalendarReply = { ok: boolean; message: string };
 
 function refresh() {
-  for (const path of ["/settings", "/calendar", "/timetable", "/"]) revalidatePath(path);
+  for (const path of ["/settings", "/calendar", "/timetable", "/assignments", "/"]) revalidatePath(path);
 }
 
 function countMessage(count: number, what: string) {
@@ -32,7 +46,8 @@ function countMessage(count: number, what: string) {
 
 export async function connectCalendar(formData: FormData): Promise<CalendarReply> {
   const link = String(formData.get("link") ?? "").trim();
-  const label = String(formData.get("label") ?? "").trim().slice(0, 60) || "Sentral";
+  const source = String(formData.get("source") ?? "");
+  if (!isCalendarSource(source)) return { ok: false, message: "Choose where the link is from first." };
   if (!link) return { ok: false, message: "Paste your calendar link first." };
 
   let count: number;
@@ -49,26 +64,32 @@ export async function connectCalendar(formData: FormData): Promise<CalendarReply
   }
 
   const supabase = await createClient();
-  // One calendar link at a time: replace any earlier one.
-  await supabase.from("connections").delete().eq("provider", CALENDAR_PROVIDER);
+  // One link per source: a new Sentral link replaces the old Sentral link, but
+  // leaves Atlantis alone. Insert first, so a failed save keeps the old link.
+  const { data: old } = await supabase.from("connections").select("id").eq("provider", source);
   const { error } = await supabase.from("connections").insert({
-    provider: CALENDAR_PROVIDER,
-    account_label: label,
+    provider: source,
+    account_label: CALENDAR_SOURCES[source],
     encrypted_token: encryptToken(link),
     status: "connected",
     last_synced_at: new Date().toISOString(),
   });
   if (error) return { ok: false, message: "The link works, but it couldn't be saved. Try again." };
+  const oldIds = (old ?? []).map((r: { id: string }) => r.id);
+  if (oldIds.length) await supabase.from("connections").delete().in("id", oldIds);
 
   refresh();
-  return { ok: true, message: countMessage(count, "link") };
+  return { ok: true, message: `${CALENDAR_SOURCES[source]} ${countMessage(count, "link").replace(/^C/, "c")}` };
 }
 
-export async function disconnectCalendar(): Promise<CalendarReply> {
+export async function disconnectCalendar(source: string): Promise<CalendarReply> {
+  if (!isCalendarSource(source)) return { ok: false, message: "Couldn't disconnect. Try again." };
   const supabase = await createClient();
-  const { error } = await supabase.from("connections").delete().eq("provider", CALENDAR_PROVIDER);
+  const { error } = await supabase.from("connections").delete().eq("provider", source);
   refresh();
-  return error ? { ok: false, message: "Couldn't disconnect. Try again." } : { ok: true, message: "Disconnected." };
+  return error
+    ? { ok: false, message: "Couldn't disconnect. Try again." }
+    : { ok: true, message: `${CALENDAR_SOURCES[source]} disconnected.` };
 }
 
 // A downloaded .ics file, for when there's no link to subscribe to. It's a
@@ -121,4 +142,80 @@ export async function clearImportedCalendar(): Promise<CalendarReply> {
   const { error } = await supabase.from("events").delete().eq("source", IMPORT_SOURCE);
   refresh();
   return error ? { ok: false, message: "Couldn't remove them. Try again." } : { ok: true, message: "Imported events removed." };
+}
+
+// ---------------------------------------------------------------------------
+// Canvas
+// ---------------------------------------------------------------------------
+
+export async function connectCanvas(formData: FormData): Promise<CalendarReply> {
+  const method = String(formData.get("method") ?? "");
+  let config: CanvasConfig;
+  let host: string;
+  try {
+    if (method === "token") {
+      const base = normaliseCanvasBase(String(formData.get("base") ?? ""));
+      const token = cleanToken(String(formData.get("token") ?? ""));
+      await testCanvasToken(base, token);
+      config = { method: "token", base, token };
+      host = new URL(base).host;
+    } else if (method === "feed") {
+      const link = String(formData.get("link") ?? "").trim();
+      if (!link) return { ok: false, message: "Paste your Canvas calendar feed link first." };
+      const url = normaliseLink(link);
+      // Fails here, before saving, if the link doesn't give a calendar.
+      parseIcs(await fetchCalendarText(link));
+      config = { method: "feed", link: url.toString() };
+      host = url.host;
+    } else {
+      return { ok: false, message: "Choose how Canvas should connect first." };
+    }
+  } catch (err) {
+    return { ok: false, message: err instanceof CanvasError || err instanceof CalendarError ? err.message : errorText(err) };
+  }
+
+  const supabase = await createClient();
+  const { data: old } = await supabase.from("connections").select("id").eq("provider", CANVAS_PROVIDER);
+  const now = new Date().toISOString();
+  const { data: saved, error } = await supabase
+    .from("connections")
+    .insert({
+      provider: CANVAS_PROVIDER,
+      account_label: host,
+      encrypted_token: encryptToken(JSON.stringify(config)),
+      status: "connected",
+    })
+    .select("id")
+    .single();
+  if (error || !saved) return { ok: false, message: "Canvas works, but the details couldn't be saved. Try again." };
+  const oldIds = (old ?? []).map((r: { id: string }) => r.id);
+  if (oldIds.length) await supabase.from("connections").delete().in("id", oldIds);
+
+  try {
+    const result = await syncWithConfig(config);
+    await supabase.from("connections").update({ last_synced_at: now, updated_at: now }).eq("id", saved.id);
+    refresh();
+    return { ok: true, message: `Connected. ${syncMessage(result)}` };
+  } catch (err) {
+    refresh();
+    return { ok: false, message: `Connected, but the first sync failed: ${errorText(err)}` };
+  }
+}
+
+export async function syncCanvasNow(): Promise<CalendarReply> {
+  const result = await syncCanvas();
+  refresh();
+  return result ?? { ok: false, message: "Canvas isn't connected." };
+}
+
+export async function disconnectCanvas(removeTasks: boolean): Promise<CalendarReply> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("connections").delete().eq("provider", CANVAS_PROVIDER);
+  if (error) return { ok: false, message: "Couldn't disconnect. Try again." };
+  if (removeTasks) await supabase.from("tasks").delete().eq("source", CANVAS_SOURCE);
+  refresh();
+  return {
+    ok: true,
+    message: removeTasks ? "Canvas disconnected and its tasks removed." : "Canvas disconnected. Its tasks stay on Assignments.",
+  };
 }

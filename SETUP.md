@@ -95,14 +95,33 @@ have one, and Mistral doesn't.
 Until a key is added, those three pages show a short "add a key" note. Everything else
 (Timetable, Notes, Study planner, Assignments) works without any AI key.
 
-## 9. (Optional) Connect your Sentral timetable
-No keys needed: this is done on the site itself.
-1. Sign in to your school's **Sentral portal** and open your **Timetable** or **Calendar**.
-2. Look for **Subscribe**, **Sync**, **iCal** or **Export**, and copy the link (often `webcal://…`).
-3. On the dashboard, open **Settings → Sentral timetable & calendar**, paste it and click **Test & connect**.
-   It then shows on Timetable, Calendar and Home.
-4. Only got a **.ics file** instead of a link? Use **Import a calendar file** on the same card. Import it
-   again whenever your timetable changes.
+## 9. (Optional) Connect your Sentral or Atlantis timetable
+No keys needed: this is done on the site itself. The dashboard can't sign in with your school email
+and password (neither Sentral nor Atlantis allows that for other apps), so use one of these:
 
-Not every school turns on calendar links for students. If you can't find one, ask the school office,
-or add your classes by hand on the Timetable page.
+**A calendar link (best, keeps itself up to date)**
+1. Sign in to **Sentral** or **Atlantis** and open your timetable or calendar.
+2. Look for **Subscribe**, **Sync**, **iCal**, **Calendar** or **Export**, and copy the link (often `webcal://…`).
+3. On the dashboard, open **Settings → Timetable & calendar**, pick **Sentral** or **Atlantis**, paste the
+   link and click **Test & connect**. You can connect both.
+
+**Paste your timetable (when there's no link)**
+1. Open your timetable in Atlantis or Sentral, ideally on a computer.
+2. Select the whole timetable table, from the row of day names to the last class, and copy it.
+3. On the dashboard, open **Timetable → Paste from Atlantis or Sentral**, click in the box and paste.
+4. Check the classes it found, untick any mistakes, and click **Save**. Teacher names are left out.
+
+**A calendar file**: got a **.ics** download? Use **Import a calendar file** on the Settings card.
+
+## 10. (Optional) Connect Canvas
+1. In Canvas, click **Account → Settings**. Under **Approved Integrations**, click **+ New Access Token**,
+   name it "Dashboard" and click **Generate Token**. Copy it straight away (Canvas only shows it once).
+2. On the dashboard, open **Settings → Canvas**, paste your school's Canvas address (e.g.
+   `yourschool.instructure.com`) and the token, then click **Test & connect**.
+3. Your Canvas work appears on **Assignments**, **Home** and **Calendar**, and things you've submitted
+   are ticked off. It checks again whenever you open Assignments or Home (at most every 30 minutes),
+   or click **Sync now**.
+
+No **New Access Token** button? Your school has turned tokens off. Choose **Calendar feed link** instead:
+in Canvas open **Calendar → Calendar Feed**, copy the link and paste it in. To cut off access later,
+delete the token in Canvas, or click **Disconnect** on the dashboard.

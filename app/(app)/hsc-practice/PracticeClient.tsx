@@ -7,7 +7,16 @@ import { Icon } from "@/components/Icon";
 import { ModelPicker, useAiModel } from "@/components/ModelPicker";
 import { RichTextEditor, type RichTextHandle } from "@/components/RichTextEditor";
 import type { AiModelOption } from "@/lib/ai";
-import { bandLabel, bandOptions, LETTERS, pastPaperLinks, type BandLevel, type Mcq } from "@/lib/hsc";
+import {
+  bandLabel,
+  bandOptions,
+  findTopic,
+  LETTERS,
+  pastPaperLinks,
+  topicsFor,
+  type BandLevel,
+  type Mcq,
+} from "@/lib/hsc";
 import type { ParsedMarking } from "@/lib/marking";
 import { generateMcqs, generateQuestion, markAnswer, saveMcqMistakes } from "./actions";
 
@@ -38,6 +47,7 @@ export function PracticeClient({
   const [kind, setKind] = useState<Kind>("written");
   const [course, setCourse] = useState(courses[0] ?? "");
   const [topic, setTopic] = useState("");
+  const [focus, setFocus] = useState("");
   const [marks, setMarks] = useState("4");
   const [band, setBand] = useState<BandLevel>("any");
   const [count, setCount] = useState("5");
@@ -87,7 +97,22 @@ export function PracticeClient({
 
   function chooseCourse(next: string) {
     setCourse(next);
-    // Extension courses label bands differently, but the levels line up, so keep the choice.
+    // Topics belong to a course, so start the topic again. Extension courses label
+    // bands differently, but the levels line up, so the band choice stays.
+    setTopic("");
+  }
+
+  const ideas = findTopic(course, topic)?.ideas ?? [];
+  const focusWords = focus
+    .split(",")
+    .map((w) => w.trim().toLowerCase())
+    .filter(Boolean);
+
+  // Adds a suggested keyword to Refine, or takes it out again.
+  function toggleIdea(idea: string) {
+    const parts = focus.split(",").map((w) => w.trim()).filter(Boolean);
+    const has = parts.some((w) => w.toLowerCase() === idea.toLowerCase());
+    setFocus((has ? parts.filter((w) => w.toLowerCase() !== idea.toLowerCase()) : [...parts, idea]).join(", "));
   }
 
   function generate() {
@@ -110,7 +135,7 @@ export function PracticeClient({
     startTransition(async () => {
       try {
         if (kind === "mcq") {
-          const res = await generateMcqs({ course, topic, band, count: Number(count), model });
+          const res = await generateMcqs({ course, topic, focus, band, count: Number(count), model });
           if (res.ok) {
             setMcqs({
               course,
@@ -123,7 +148,7 @@ export function PracticeClient({
             setStatus(res.text);
           }
         } else {
-          const res = await generateQuestion({ course, topic, marks, band, model });
+          const res = await generateQuestion({ course, topic, focus, marks, band, model });
           if (res.ok) {
             setQuestion({ text: res.text, course, topic, band: bandLabel(course, band), own: false });
             setQuestionMeta(res.note ?? `Written by ${res.model}`);
@@ -211,14 +236,18 @@ export function PracticeClient({
           </select>
           {kind !== "own" ? (
             <>
-              <input
-                className="input"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="Topic (optional) e.g. Projectile motion"
-                aria-label="Topic"
-                maxLength={120}
-              />
+              <select className="input" value={topic} onChange={(e) => setTopic(e.target.value)} aria-label="Topic">
+                <option value="">Any topic</option>
+                {topicsFor(course).map((g) => (
+                  <optgroup key={g.year} label={g.year}>
+                    {g.topics.map((x) => (
+                      <option key={x.name} value={x.name}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
               <select
                 className="input"
                 value={band}
@@ -256,6 +285,47 @@ export function PracticeClient({
             </button>
           ) : null}
         </div>
+
+        {kind !== "own" ? (
+          <div className="field refine">
+            <label htmlFor="hsc-refine" className="field-label">
+              Refine <span className="field-help">(optional keywords)</span>
+            </label>
+            <input
+              id="hsc-refine"
+              className="input"
+              value={focus}
+              onChange={(e) => setFocus(e.target.value)}
+              placeholder={ideas.length ? `e.g. ${ideas.slice(0, 2).join(", ")}` : "e.g. stress, strain, Young's modulus"}
+              maxLength={120}
+              enterKeyHint="go"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  generate();
+                }
+              }}
+            />
+            {ideas.length ? (
+              <div className="idea-row" role="group" aria-label="Suggested keywords">
+                {ideas.map((idea) => {
+                  const on = focusWords.includes(idea.toLowerCase());
+                  return (
+                    <button
+                      key={idea}
+                      type="button"
+                      className={`idea${on ? " is-on" : ""}`}
+                      aria-pressed={on}
+                      onClick={() => toggleIdea(idea)}
+                    >
+                      {idea}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {kind === "own" ? (
           <>
@@ -296,6 +366,7 @@ export function PracticeClient({
             <h2 className="card-title">Question</h2>
             <div className="fc-tags">
               {question.band ? <span className="chip-outline">{question.band}</span> : null}
+              {question.topic ? <span className="chip-outline">{question.topic}</span> : null}
               <span className="chip-outline">{question.course}</span>
             </div>
           </div>
@@ -462,6 +533,7 @@ function McqSetCard({
         <h2 className="card-title">Multiple choice</h2>
         <div className="fc-tags">
           {set.band ? <span className="chip-outline">{set.band}</span> : null}
+          {set.topic ? <span className="chip-outline">{set.topic}</span> : null}
           <span className="chip-outline">{set.course}</span>
           {checked ? (
             <span className="mark-score">

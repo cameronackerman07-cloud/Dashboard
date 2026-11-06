@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatDue, type DbTask } from "@/lib/tasks";
+import { formatDue, sourceLabel, type DbTask } from "@/lib/tasks";
 
 // Read-only glance at the next few tasks, shown on Home. Relative dates are
 // computed after mount (see formatDue) so they match the viewer's timezone
@@ -22,7 +22,7 @@ export function DueSoon({ tasks }: { tasks: DbTask[] }) {
     <div className="track-list">
       {tasks.map((task) => {
         const { text, overdue } = formatDue(task.due_at, { short: true, now });
-        const sub = [task.course, task.source && task.source !== "manual" ? task.source : null]
+        const sub = [task.course, sourceLabel(task.source)]
           .filter(Boolean)
           .join(" · ");
         return (

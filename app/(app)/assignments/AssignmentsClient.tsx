@@ -2,7 +2,7 @@
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { Icon } from "@/components/Icon";
-import { formatDue, type DbTask } from "@/lib/tasks";
+import { formatDue, sourceLabel, type DbTask } from "@/lib/tasks";
 import { addTask, deleteTask, setTaskDone } from "./actions";
 
 export type Task = DbTask;
@@ -135,7 +135,7 @@ export function AssignmentsClient({ tasks, courses }: { tasks: Task[]; courses: 
           <div className="track-list">
             {optimisticTasks.map((task) => {
               const { text, overdue } = formatDue(task.due_at, { now });
-              const sub = [task.course, task.source === "manual" ? null : task.source]
+              const sub = [task.course, sourceLabel(task.source)]
                 .filter(Boolean)
                 .join(" · ");
               return (

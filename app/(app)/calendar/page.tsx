@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
-import { getCalendarConnection, loadEvents, type CalEvent } from "@/lib/calendar";
+import { getCalendarConnections, loadEvents, type CalEvent } from "@/lib/calendar";
 import { dayKey, formatDay, formatTime, startOfDay } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Calendar" };
@@ -12,9 +12,9 @@ export default async function CalendarPage() {
   const now = Date.now();
   const from = startOfDay(now);
   const to = startOfDay(now, DAYS_SHOWN);
-  const [{ events, error }, connection] = await Promise.all([
+  const [{ events, error }, connections] = await Promise.all([
     loadEvents(from, to, { includeTasks: true }),
-    getCalendarConnection(),
+    getCalendarConnections(),
   ]);
 
   // One section per day, all-day items first. An event that runs over several
@@ -35,7 +35,7 @@ export default async function CalendarPage() {
       <PageHeader
         icon="calendar"
         title="Calendar"
-        lede="The next two weeks: your Sentral calendar, imported events and what's due."
+        lede="The next two weeks: your Sentral or Atlantis calendar, imported events and what's due."
       />
 
       {error ? (
@@ -44,9 +44,9 @@ export default async function CalendarPage() {
         </p>
       ) : null}
 
-      {!connection && !events.some((e) => e.source !== "task") ? (
+      {connections.length === 0 && !events.some((e) => e.source !== "task") ? (
         <div className="notice" role="note">
-          <span>Connect your Sentral calendar to see your timetable and school events here.</span>
+          <span>Connect your Sentral or Atlantis calendar to see your timetable and school events here.</span>
           <Link href="/settings" className="card-link">
             Connect →
           </Link>

@@ -504,3 +504,40 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .auth-done { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
 .auth-done-icon { width: 44px; height: 44px; border-radius: 10px; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; }
 .auth-foot { font-size: 12px; color: var(--muted); }
+
+/* HSC practice: Refine keywords */
+.refine { gap: 8px; }
+.refine .field-help { font-weight: 400; }
+.idea-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.idea {
+  font: inherit; font-size: 13px; font-weight: 500; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line-strong); border-radius: 999px; padding: 6px 12px; min-height: 34px; cursor: pointer;
+}
+.idea:hover { border-color: var(--ink); }
+.idea.is-on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.idea:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+@media (pointer: coarse) { .idea { min-height: 44px; } }
+
+/* Canvas form */
+.connect-form { display: flex; flex-direction: column; gap: 22px; }
+
+/* Timetable: paste from Atlantis or Sentral */
+.paste-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--ink); }
+.paste-preview { display: flex; flex-direction: column; gap: 12px; }
+.paste-rows { display: flex; flex-direction: column; gap: 8px; }
+.paste-row {
+  display: grid; grid-template-columns: 24px minmax(110px, 1fr) minmax(110px, 1fr) minmax(90px, 0.8fr) minmax(140px, 1.6fr) minmax(80px, 0.7fr);
+  gap: 8px; align-items: center;
+}
+.paste-row input[type="checkbox"], .paste-replace input { width: 20px; height: 20px; accent-color: var(--ink); }
+.paste-row.is-off { opacity: 0.45; }
+.paste-replace { display: flex; align-items: center; gap: 10px; font-size: 14px; min-height: 44px; }
+@media (max-width: 760px) {
+  .paste-row { grid-template-columns: 24px 1fr 1fr; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .paste-row > :nth-child(1) { grid-area: 1 / 1; }
+  .paste-row > :nth-child(2) { grid-area: 1 / 2; }
+  .paste-row > :nth-child(3) { grid-area: 1 / 3; }
+  .paste-row > :nth-child(5) { grid-area: 2 / 2 / 3 / 4; }
+  .paste-row > :nth-child(4) { grid-area: 3 / 2; }
+  .paste-row > :nth-child(6) { grid-area: 3 / 3; }
+}

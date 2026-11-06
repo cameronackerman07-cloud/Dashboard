@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { CalendarConnect } from "@/components/CalendarConnect";
 import { CanvasConnect } from "@/components/CanvasConnect";
 import { Icon, type IconName } from "@/components/Icon";
-import { getCalendarConnection, IMPORT_SOURCE } from "@/lib/calendar";
+import { getCalendarConnections, IMPORT_SOURCE } from "@/lib/calendar";
+import { getCanvasStatus } from "@/lib/canvas";
 import { createClient } from "@/lib/supabase/server";
 import { formatShortDate } from "@/lib/time";
 
@@ -14,8 +15,7 @@ type Row = { name: string; desc: string; action: string; icon: IconName };
 const SCHOOL: Row[] = [
   { name: "Google — personal", desc: "Calendar, Drive and Google Classroom", action: "Connect", icon: "google" },
   { name: "Google — school", desc: "Add a second account. If your school blocks it, share the calendar to your personal account instead.", action: "Connect", icon: "google" },
-  { name: "Compass", desc: "For now, paste its calendar link into the calendar card above", action: "Add link", icon: "link" },
-  { name: "Atlantis Timetable", desc: "For now, paste its calendar link into the calendar card above", action: "Add link", icon: "timetable" },
+  { name: "Compass", desc: "For now, paste its calendar link into the calendar card above, under Other link", action: "Add link", icon: "link" },
 ];
 
 const DEVICES: Row[] = [
@@ -60,8 +60,9 @@ export default async function SettingsPage() {
   const keyStatus = (env: string) => (process.env[env] ? "Key set" : "Key not set");
 
   const supabase = await createClient();
-  const [connection, imported] = await Promise.all([
-    getCalendarConnection(),
+  const [calendars, canvas, imported] = await Promise.all([
+    getCalendarConnections(),
+    getCanvasStatus(),
     supabase.from("events").select("id", { count: "exact", head: true }).eq("source", IMPORT_SOURCE),
   ]);
 
@@ -82,13 +83,28 @@ export default async function SettingsPage() {
       </div>
 
       <CalendarConnect
-        connected={connection?.status === "connected"}
-        label={connection?.label ?? null}
-        syncedLabel={connection?.lastSyncedAt ? formatShortDate(new Date(connection.lastSyncedAt).getTime()) : null}
+        connected={calendars
+          .filter((c) => c.status === "connected")
+          .map((c) => ({
+            source: c.source,
+            name: c.name,
+            syncedLabel: c.lastSyncedAt ? formatShortDate(new Date(c.lastSyncedAt).getTime()) : null,
+          }))}
         importedCount={imported.count ?? 0}
       />
 
-      <CanvasConnect />
+      <CanvasConnect
+        state={
+          canvas
+            ? {
+                method: canvas.method,
+                host: canvas.host,
+                needsFixing: canvas.status !== "connected",
+                syncedLabel: canvas.lastSyncedAt ? formatShortDate(new Date(canvas.lastSyncedAt).getTime()) : null,
+              }
+            : null
+        }
+      />
 
       <section style={{ display: "flex", flexDirection: "column", gap: 10 }} aria-label="School and Google">
         <h2 className="section-label">School &amp; Google</h2>

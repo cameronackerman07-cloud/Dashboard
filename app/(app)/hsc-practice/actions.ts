@@ -95,19 +95,24 @@ function cleanBand(band: string): BandLevel {
   return BANDS.includes(band as BandLevel) ? (band as BandLevel) : "any";
 }
 
-function onTopic(topic: string): string {
+// "on the topic X, focusing on Y". The focus is the student's own keywords from
+// Refine, e.g. "stress and strain".
+function onTopic(topic: string, focus = ""): string {
   const t = topic.trim().slice(0, MAX_TOPIC);
-  return t ? ` on the topic "${t}"` : "";
+  const f = focus.replace(/\s+/g, " ").trim().slice(0, MAX_TOPIC);
+  const topicPart = t ? ` on the topic "${t}"` : "";
+  return f ? `${topicPart}, focusing on: ${f}` : topicPart;
 }
 
 export async function generateQuestion(input: {
   course: string;
   topic: string;
+  focus?: string;
   marks: string;
   band: string;
   model?: string;
 }): Promise<QuestionReply> {
-  const { course, topic, marks, model } = input;
+  const { course, topic, focus, marks, model } = input;
   if (!course) return { ok: false, text: "Pick a subject first." };
   if (!(await isSignedIn())) return { ok: false, text: SIGNED_OUT };
 
@@ -116,7 +121,7 @@ export async function generateQuestion(input: {
       [
         {
           role: "user",
-          content: `Write one HSC-style ${course} question${onTopic(topic)}, worth ${marks || "a few"} marks. Make it ${bandGuide(course, cleanBand(input.band))}.`,
+          content: `Write one HSC-style ${course} question${onTopic(topic, focus)}, worth ${marks || "a few"} marks. Make it ${bandGuide(course, cleanBand(input.band))}.`,
         },
       ],
       { system: QUESTION_SYSTEM, temperature: 0.7, model },
@@ -183,11 +188,12 @@ function toMcqs(data: unknown): Mcq[] {
 export async function generateMcqs(input: {
   course: string;
   topic: string;
+  focus?: string;
   band: string;
   count: number;
   model?: string;
 }): Promise<McqReply> {
-  const { course, topic, model } = input;
+  const { course, topic, focus, model } = input;
   const count = Math.min(10, Math.max(1, Math.round(input.count) || 5));
   if (!course) return { ok: false, text: "Pick a subject first." };
   if (!(await isSignedIn())) return { ok: false, text: SIGNED_OUT };
@@ -197,7 +203,7 @@ export async function generateMcqs(input: {
       [
         {
           role: "user",
-          content: `Write ${count} HSC-style ${course} multiple-choice questions${onTopic(topic)}. Make each ${bandGuide(course, cleanBand(input.band))}. Cover different ideas in each question.`,
+          content: `Write ${count} HSC-style ${course} multiple-choice questions${onTopic(topic, focus)}. Make each ${bandGuide(course, cleanBand(input.band))}. Cover different ideas in each question.`,
         },
       ],
       { system: MCQ_SYSTEM, temperature: 0.7, model },

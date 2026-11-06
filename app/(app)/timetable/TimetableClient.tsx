@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { Icon } from "@/components/Icon";
 import { addClass, deleteClass } from "./actions";
+import { TimetablePaste } from "./TimetablePaste";
 
 // One weekday of events from the connected calendar, already formatted on the server.
 export type LinkedDay = {
@@ -98,12 +99,14 @@ export function TimetableClient({
       ) : null}
       {!connected && !linked ? (
         <div className="notice" role="note">
-          <span>Connect your Sentral timetable to fill this in automatically.</span>
+          <span>Connect a Sentral or Atlantis calendar link to fill this in automatically, or paste your timetable below.</span>
           <Link href="/settings" className="card-link">
             Connect →
           </Link>
         </div>
       ) : null}
+
+      <TimetablePaste courses={courses} existing={classes.length} />
 
       <section className="card" aria-label="Add a class">
         <h2 className="card-title">Add a class</h2>

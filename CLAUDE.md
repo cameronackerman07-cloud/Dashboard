@@ -39,11 +39,22 @@ Read this before every task. Keep it up to date when decisions change.
 - `components/PageHeader.tsx` — shared breadcrumb + icon + title + lede for built pages.
 - `components/DueSoon.tsx` — Home's live "Due soon" card. `lib/tasks.ts` — shared task shape +
   `formatDue` (pass `now` only after mount to avoid hydration mismatches).
-- `app/(app)/settings/page.tsx` + `components/CanvasConnect.tsx` — Connections screen.
-- Calendar link (Sentral or any .ics): `components/CalendarConnect.tsx` + `app/(app)/settings/actions.ts`.
-  The link is a secret, stored encrypted in `connections` (provider `sentral`). `lib/calendar.ts`
-  fetches it server-side with SSRF checks (https only, public hosts, checked redirects, 3 MB cap),
-  caches 15 min, and merges imported .ics files (`events`, source `sentral-file`) and due tasks.
+- `app/(app)/settings/page.tsx` — Connections screen. Its server actions are `app/(app)/settings/actions.ts`.
+- Calendar links: `components/CalendarConnect.tsx`. One link per source (`lib/calendar-sources.ts`:
+  providers `sentral`, `atlantis`, `ical`), stored encrypted in `connections`. `lib/calendar.ts`
+  fetches them server-side (checks in `lib/safe-fetch.ts`: https only, public hosts, checked redirects,
+  3 MB cap), caches 15 min, and merges imported .ics files (`events`, source `sentral-file`) and due tasks.
+- No password logins for Sentral or Atlantis: neither offers one for other apps, Atlantis's terms ban
+  sharing logins, and the school password must not be stored here. Links, .ics files, or the paste
+  importer instead (`app/(app)/timetable/TimetablePaste.tsx` + `lib/timetable-paste.ts`): reads a
+  copied timetable table, tab-separated text or typed lines in the browser, keeps subject, room and
+  period only, then `importClasses` saves to `timetable`.
+- Canvas: `components/CanvasConnect.tsx` + `lib/canvas.ts`. Address + access token (planner API) or
+  calendar feed link, saved encrypted as JSON in `connections` (provider `canvas`). Syncs into `tasks`
+  (source `canvas`, external_id like `assignment:123`) on connect, "Sync now", and when Assignments or
+  Home opens if the last sync is over 30 min old. The token is only sent to the saved Canvas origin:
+  redirects aren't followed and pagination links to other origins are ignored. Submitted work is
+  ticked off; a sync never un-ticks. `lib/courses.ts` maps school class names to COURSES.
   `lib/ics.ts` parses .ics (time zones, daily/weekly repeats); `lib/time.ts` formats in Sydney time
   so server and browser output match. Used by `calendar`, `timetable` and Home's Today card.
 - `app/privacy/page.tsx`, `app/terms/page.tsx` — public legal pages (outside `(app)`, no sidebar,
@@ -77,8 +88,9 @@ Read this before every task. Keep it up to date when decisions change.
 - `components/RichTextEditor.tsx` — formatted typed answers, built on the browser's editing commands.
   Formatting is display-only: `toPlainText` sends text with `^`, `_` and `#` to the AI. Paste is
   plain text only, and the HTML is never saved.
-- `lib/hsc.ts` — band levels (E1–E4 for Extension courses), the multiple-choice shape, and
-  per-course past-paper links. Past papers are linked, never copied or scraped (NESA's and schools'
+- `lib/hsc.ts` — band levels (E1–E4 for Extension courses), syllabus topics per course (`TOPICS`, with
+  suggested Refine keywords; Maths and English follow the 2024 syllabuses, first HSC 2027; Physics
+  stays on the 2017 syllabus until the 2028 HSC), the multiple-choice shape, and per-course past-paper links. Past papers are linked, never copied or scraped (NESA's and schools'
   copyright); "My own question" lets the student paste one in to be marked.
 - `lib/marking.ts` splits the marker's reply into sections and flashcards. `markAnswer` saves the
   flashcards automatically; `lib/flashcards.ts` schedules reviews, shown on `app/(app)/flashcards`.
@@ -106,7 +118,8 @@ Physics · VET Entertainment · English Standard  (see `COURSES` in `lib/nav.ts`
   school's admin — show a clear message suggesting sharing the school calendar to the personal account.
   The OAuth app must be published "In production" (unverified is fine) so refresh tokens don't expire
   after 7 days.
-- **Compass / Atlantis Timetable**: no public API — use their calendar subscription (.ics) links.
+- **Compass / Atlantis Timetable / Sentral**: no public API — use their calendar subscription (.ics)
+  links, an .ics file, or the Timetable paste importer. Never store school passwords.
 - **Apple Calendar**: expose a private, unguessable `.ics` feed URL of the dashboard's calendar.
 - **Apple Reminders / Siri**: provide an iOS Shortcut that calls a JSON endpoint
   (`/api/shortcuts/due`) authenticated with a per-user secret token.

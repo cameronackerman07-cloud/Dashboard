@@ -1,17 +1,23 @@
 import "server-only";
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import {
+  CALENDAR_SOURCE_IDS as PROVIDERS,
+  CALENDAR_SOURCES,
+  isCalendarSource,
+  type CalendarSource,
+} from "@/lib/calendar-sources";
 import { decryptToken } from "@/lib/crypto";
 import { eventsBetween, parseIcs, type ParsedCalendar } from "@/lib/ics";
+import { assertPublicHost, readCapped, SafeFetchError } from "@/lib/safe-fetch";
 import { createClient } from "@/lib/supabase/server";
 
-// The student's calendar link (Sentral, or any other .ics link) and imported
-// calendar files, merged into one list of events.
+// The student's calendar links (Sentral, Atlantis, or any other .ics link) and
+// imported calendar files, merged into one list of events.
 //
-// The link is a secret (anyone with it can read the calendar), so it's stored
+// A link is a secret (anyone with it can read the calendar), so it's stored
 // encrypted in `connections` and only decrypted here, on the server.
 
-export const CALENDAR_PROVIDER = "sentral";
+export { CALENDAR_SOURCES, isCalendarSource, type CalendarSource };
+
 export const IMPORT_SOURCE = "sentral-file";
 
 export type CalEvent = {
@@ -29,37 +35,11 @@ const FETCH_TIMEOUT_MS = 10_000;
 const CACHE_MS = 15 * 60 * 1000;
 const MAX_REDIRECTS = 3;
 
-export class CalendarError extends Error {}
+export const CalendarError = SafeFetchError;
 
 // ---------------------------------------------------------------------------
-// Fetching a link safely. The link comes from the user, so the server must not
-// be talked into fetching something private (its own network, cloud metadata).
+// Fetching a link safely (see lib/safe-fetch.ts).
 // ---------------------------------------------------------------------------
-
-function isPrivateAddress(address: string): boolean {
-  if (isIP(address) === 4) {
-    const [a, b] = address.split(".").map(Number);
-    return (
-      a === 0 ||
-      a === 10 ||
-      a === 127 ||
-      (a === 100 && b >= 64 && b <= 127) ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      a >= 224
-    );
-  }
-  const v6 = address.toLowerCase();
-  return (
-    v6 === "::" ||
-    v6 === "::1" ||
-    v6.startsWith("fc") ||
-    v6.startsWith("fd") ||
-    v6.startsWith("fe80") ||
-    (v6.startsWith("::ffff:") && isPrivateAddress(v6.slice(7)))
-  );
-}
 
 // Accepts https and webcal links, and turns webcal into https.
 export function normaliseLink(raw: string): URL {
@@ -76,40 +56,6 @@ export function normaliseLink(raw: string): URL {
     throw new CalendarError("That link can't be used. Copy the calendar link exactly as your school gives it.");
   }
   return url;
-}
-
-async function assertPublicHost(url: URL) {
-  const host = url.hostname.replace(/^\[|\]$/g, "");
-  if (isIP(host) || host === "localhost" || /\.(local|internal|localhost)$/i.test(host)) {
-    throw new CalendarError("That link points somewhere private, so it can't be used.");
-  }
-  let addresses: { address: string }[];
-  try {
-    addresses = await lookup(host, { all: true });
-  } catch {
-    throw new CalendarError("Couldn't find that website. Check the link is complete.");
-  }
-  if (addresses.length === 0 || addresses.some((a) => isPrivateAddress(a.address))) {
-    throw new CalendarError("That link points somewhere private, so it can't be used.");
-  }
-}
-
-async function readCapped(res: Response): Promise<string> {
-  const reader = res.body?.getReader();
-  if (!reader) return "";
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > MAX_BYTES) {
-      await reader.cancel();
-      throw new CalendarError("That calendar is too big to load (over 3 MB).");
-    }
-    chunks.push(value);
-  }
-  return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
 export async function fetchCalendarText(link: string): Promise<string> {
@@ -139,7 +85,7 @@ export async function fetchCalendarText(link: string): Promise<string> {
     }
     if (!res.ok) throw new CalendarError(`That link didn't work (error ${res.status}).`);
 
-    const text = await readCapped(res);
+    const text = await readCapped(res, MAX_BYTES, "That calendar is too big to load (over 3 MB).");
     if (!text.includes("BEGIN:VCALENDAR")) {
       throw new CalendarError("That link opens a web page, not a calendar. Look for a link marked iCal, ICS, subscribe or webcal.");
     }
@@ -157,37 +103,37 @@ const linkCache = new Map<string, { at: number; calendar: ParsedCalendar }>();
 
 export type CalendarConnection = {
   id: string;
-  label: string | null;
+  source: CalendarSource;
+  name: string; // "Sentral", "Atlantis" or "Other calendar"
   status: string;
   lastSyncedAt: string | null;
 };
 
-export async function getCalendarConnection(): Promise<CalendarConnection | null> {
+// Every connected calendar link, in a fixed order (Sentral, Atlantis, other).
+export async function getCalendarConnections(): Promise<CalendarConnection[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("connections")
-    .select("id, account_label, status, last_synced_at")
-    .eq("provider", CALENDAR_PROVIDER)
-    .order("created_at", { ascending: false })
-    .limit(1);
-  const row = data?.[0];
-  return row
-    ? { id: row.id, label: row.account_label, status: row.status, lastSyncedAt: row.last_synced_at }
-    : null;
+    .select("id, provider, status, last_synced_at")
+    .in("provider", PROVIDERS)
+    .order("created_at", { ascending: false });
+  const seen = new Set<string>();
+  const rows: CalendarConnection[] = [];
+  for (const row of (data ?? []) as { id: string; provider: string; status: string; last_synced_at: string | null }[]) {
+    if (!isCalendarSource(row.provider) || seen.has(row.provider)) continue;
+    seen.add(row.provider);
+    rows.push({
+      id: row.id,
+      source: row.provider,
+      name: CALENDAR_SOURCES[row.provider],
+      status: row.status,
+      lastSyncedAt: row.last_synced_at,
+    });
+  }
+  return rows.sort((x, y) => PROVIDERS.indexOf(x.source) - PROVIDERS.indexOf(y.source));
 }
 
-async function linkEvents(fromMs: number, toMs: number): Promise<{ events: CalEvent[]; error: string | null }> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("connections")
-    .select("id, encrypted_token, updated_at")
-    .eq("provider", CALENDAR_PROVIDER)
-    .eq("status", "connected")
-    .order("created_at", { ascending: false })
-    .limit(1);
-  const row = data?.[0];
-  if (!row?.encrypted_token) return { events: [], error: null };
-
+async function oneLink(row: { id: string; provider: string; encrypted_token: string; updated_at: string }, fromMs: number, toMs: number): Promise<{ events: CalEvent[]; error: string | null }> {
   const key = `${row.id}|${row.updated_at}`;
   let calendar = linkCache.get(key);
   if (!calendar || Date.now() - calendar.at > CACHE_MS) {
@@ -198,15 +144,16 @@ async function linkEvents(fromMs: number, toMs: number): Promise<{ events: CalEv
     } catch (err) {
       // Keep showing the last copy we had, if any, rather than nothing.
       if (!calendar) {
+        const name = isCalendarSource(row.provider) ? CALENDAR_SOURCES[row.provider] : "Calendar";
         const message = err instanceof CalendarError ? err.message : "Couldn't load your calendar link.";
-        return { events: [], error: message };
+        return { events: [], error: `${name}: ${message}` };
       }
     }
   }
 
   return {
     events: eventsBetween(calendar.calendar, fromMs, toMs).map((e) => ({
-      id: `link|${e.uid}|${e.start}`,
+      id: `link|${row.provider}|${e.uid}|${e.start}`,
       title: e.title,
       location: e.location,
       start: e.start,
@@ -216,6 +163,27 @@ async function linkEvents(fromMs: number, toMs: number): Promise<{ events: CalEv
     })),
     error: null,
   };
+}
+
+async function linkEvents(fromMs: number, toMs: number): Promise<{ events: CalEvent[]; error: string | null }> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("connections")
+    .select("id, provider, encrypted_token, updated_at")
+    .in("provider", PROVIDERS)
+    .eq("status", "connected")
+    .order("created_at", { ascending: false });
+
+  // Newest link per source only.
+  const seen = new Set<string>();
+  const rows = ((data ?? []) as { id: string; provider: string; encrypted_token: string | null; updated_at: string }[])
+    .filter((r) => r.encrypted_token && !seen.has(r.provider) && seen.add(r.provider))
+    .map((r) => ({ ...r, encrypted_token: r.encrypted_token as string }));
+  if (rows.length === 0) return { events: [], error: null };
+
+  const results = await Promise.all(rows.map((r) => oneLink(r, fromMs, toMs)));
+  const errors = results.map((r) => r.error).filter(Boolean);
+  return { events: results.flatMap((r) => r.events), error: errors.length ? errors.join(" ") : null };
 }
 
 async function importedEvents(fromMs: number, toMs: number): Promise<CalEvent[]> {

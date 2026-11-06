@@ -51,3 +51,11 @@ export function formatDue(
   }
   return { text: due.toLocaleDateString(undefined, monthDay), overdue: false };
 }
+
+// "canvas" → "Canvas". Manual tasks have no label.
+const SOURCE_LABELS: Record<string, string> = { canvas: "Canvas", classroom: "Google Classroom", compass: "Compass" };
+
+export function sourceLabel(source: string | null): string | null {
+  if (!source || source === "manual") return null;
+  return SOURCE_LABELS[source] ?? source;
+}

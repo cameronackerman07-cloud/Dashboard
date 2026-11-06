@@ -1,16 +1,18 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Icon } from "@/components/Icon";
+import { AUTO_SYNC_MS, syncCanvas } from "@/lib/canvas";
 import { COURSES } from "@/lib/nav";
 import { createClient } from "@/lib/supabase/server";
 import { AssignmentsClient, type Task } from "./AssignmentsClient";
 
 export const metadata: Metadata = { title: "Assignments" };
 
-// Combined due-date tracker (phase 1). For now it holds tasks you add yourself;
-// Canvas, Google Classroom and Compass tasks will be imported into the same
-// `tasks` table later and appear here alongside them.
+// Combined due-date tracker: your own tasks plus Canvas work (source "canvas"),
+// synced from lib/canvas.ts. Google Classroom and Compass can feed the same table later.
 export default async function AssignmentsPage() {
+  // Pull in new Canvas work first, if the last sync is over 30 minutes old.
+  const sync = await syncCanvas({ maxAgeMs: AUTO_SYNC_MS });
   const supabase = await createClient();
   const { data } = await supabase
     .from("tasks")
@@ -37,10 +39,16 @@ export default async function AssignmentsPage() {
           <h1 className="page-title">Assignments</h1>
         </div>
         <p className="lede">
-          Everything due, in one place. Add your own tasks and tick them off. Canvas, Google
-          Classroom and Compass tasks will feed in here automatically once those are connected.
+          Everything due, in one place. Add your own tasks and tick them off. Canvas work comes in
+          automatically once you <Link href="/settings">connect Canvas</Link>, and is ticked off when you submit it.
         </p>
       </div>
+
+      {sync && !sync.ok ? (
+        <p className="ai-error" role="alert">
+          Canvas: {sync.message} <Link href="/settings">Check Canvas in Settings</Link>
+        </p>
+      ) : null}
 
       <AssignmentsClient tasks={tasks} courses={COURSES} />
     </main>

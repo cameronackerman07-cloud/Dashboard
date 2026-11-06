@@ -2,7 +2,8 @@ import Link from "next/link";
 import { DueSoon } from "@/components/DueSoon";
 import { Greeting } from "@/components/Greeting";
 import { Icon } from "@/components/Icon";
-import { getCalendarConnection, loadEvents } from "@/lib/calendar";
+import { getCalendarConnections, loadEvents } from "@/lib/calendar";
+import { AUTO_SYNC_MS, syncCanvas } from "@/lib/canvas";
 import { createClient } from "@/lib/supabase/server";
 import { SAMPLE_HABITS } from "@/lib/sample";
 import type { DbTask } from "@/lib/tasks";
@@ -11,9 +12,11 @@ import { formatTime, startOfDay, weekday } from "@/lib/time";
 type TodayRow = { key: string; slot: string; name: string; sub: string | null; chip: "NOW" | "NEXT" | null };
 
 export default async function Home() {
+  // New Canvas work first, so "Due soon" includes it (at most every 30 minutes).
+  await syncCanvas({ maxAgeMs: AUTO_SYNC_MS });
   const supabase = await createClient();
   const now = Date.now();
-  const [{ data }, { events }, connection, { data: manual }] = await Promise.all([
+  const [{ data }, { events }, connections, { data: manual }] = await Promise.all([
     supabase
       .from("tasks")
       .select("id, title, course, source, due_at, done")
@@ -22,7 +25,7 @@ export default async function Home() {
       .order("created_at", { ascending: true })
       .limit(5),
     loadEvents(startOfDay(now), startOfDay(now, 1)),
-    getCalendarConnection(),
+    getCalendarConnections(),
     supabase
       .from("timetable")
       .select("id, period, subject, room")
@@ -51,7 +54,7 @@ export default async function Home() {
         chip: e.start <= now && e.end > now ? ("NOW" as const) : i === nextIndex ? ("NEXT" as const) : null,
       })),
     ];
-    todaySource = "Sentral";
+    todaySource = connections.map((c) => c.name).join(" + ") || "Imported calendar";
   } else {
     today = (manual ?? []).map((c: { id: string; period: string | null; subject: string; room: string | null }) => ({
       key: c.id,
@@ -118,16 +121,16 @@ export default async function Home() {
         <section className="card" aria-label="Today's timetable">
           <div className="card-head">
             <h2 className="card-title">Today</h2>
-            <Link href={connection ? "/calendar" : "/timetable"} className="card-link">
+            <Link href={connections.length ? "/calendar" : "/timetable"} className="card-link">
               {todaySource}
             </Link>
           </div>
           {today.length === 0 ? (
             <p className="track-empty">
               Nothing on today.{" "}
-              {connection ? null : (
+              {connections.length ? null : (
                 <>
-                  <Link href="/settings">Connect Sentral</Link> or{" "}
+                  <Link href="/settings">Connect Sentral or Atlantis</Link> or{" "}
                   <Link href="/timetable">add your classes</Link> to see your day here.
                 </>
               )}
