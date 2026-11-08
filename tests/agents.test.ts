@@ -60,3 +60,39 @@ test("importance rises as the due date nears", () => {
   assert.equal(importanceFor(now + 5 * 86_400_000, now), 3);
   assert.equal(importanceFor(now + 20 * 86_400_000, now), 2);
 });
+
+import { coachSettings, courseProgress, staleSubjects, weakestTopics } from "@/lib/coach";
+
+test("coach: weakest topics ranked by misses, ease and overdue cards", () => {
+  const base = { module: "M", cards: 10, due: 0, lapses: 0, avgEase: 2.5, lastStudied: null };
+  const w = weakestTopics([
+    { ...base, subject: "Physics", topic: "Easy" },
+    { ...base, subject: "Physics", topic: "Hard", lapses: 12, avgEase: 1.6, due: 6 },
+    { ...base, subject: "Maths", topic: "Medium", lapses: 4, due: 2 },
+  ]);
+  assert.deepEqual(w.map((t) => t.topic), ["Hard", "Medium"]);
+});
+
+test("coach: subjects not studied for days", () => {
+  const now = t("2026-11-10", "16:00");
+  const base = { module: "M", topic: "T", cards: 5, due: 0, lapses: 0, avgEase: 2.5 };
+  const s = staleSubjects([{ ...base, subject: "A", lastStudied: new Date(now - 86_400_000).toISOString() }, { ...base, subject: "B", lastStudied: new Date(now - 6 * 86_400_000).toISOString() }], now);
+  assert.deepEqual(s, [{ subject: "B", daysSince: 6 }]);
+});
+
+test("coach: weighted average and trend per course", () => {
+  const p = courseProgress([
+    { course: "Physics", task: "1", date: "2026-03-01", weighting: 20, mark: 15, max_mark: 20 },
+    { course: "Physics", task: "2", date: "2026-06-01", weighting: 30, mark: 18, max_mark: 20 },
+    { course: "Physics", task: "3", date: "2026-09-01", weighting: 30, mark: null, max_mark: null },
+  ]);
+  assert.equal(p[0].average, 84);
+  assert.equal(p[0].trend, "up");
+  assert.equal(p[0].upcoming, 1);
+});
+
+test("coach settings: defaults to 99 and rejects bad values", () => {
+  assert.equal(coachSettings({}).targetAtar, 99);
+  assert.equal(coachSettings({ target_atar: 150 }).targetAtar, 99);
+  assert.deepEqual(coachSettings({ targets: { Physics: 95, Bad: 300 } }).targets, { Physics: 95 });
+});

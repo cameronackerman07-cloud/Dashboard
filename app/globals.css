@@ -777,3 +777,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .spotify-title { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spotify-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spotify-tile .icon-btn { width: 44px; height: 44px; border-radius: 22px; }
+
+/* Coach */
+.link-list { margin: 8px 0 12px; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
+.link-list a, .coach-guide a { color: var(--ink); text-decoration: underline; }
+.coach-guide { border-top: 1px solid var(--line); padding: 10px 0; font-size: 14px; line-height: 1.5; }
+.coach-guide summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.coach-guide h3 { margin-top: 10px; }
+.coach-guide ol, .coach-guide ul { padding-left: 20px; display: grid; gap: 4px; }
+details > summary.btn { list-style: none; display: inline-flex; margin-bottom: 12px; }

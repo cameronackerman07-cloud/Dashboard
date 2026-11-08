@@ -365,3 +365,83 @@ begin
   execute 'create policy "budget_plans: all own" on public.budget_plans for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))';
 end
 $$;
+
+-- ===========================================================================
+-- Coach (the 99 ATAR agent): assessment marks and saved topic guides.
+-- Coach settings (target ATAR, target marks, key dates) live in the
+-- school_coach agent's config.
+-- ===========================================================================
+create table if not exists public.assessments (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  course     text not null check (char_length(course) between 1 and 80),
+  task       text not null check (char_length(task) between 1 and 120),
+  date       date,
+  weighting  numeric(5,2) check (weighting between 0 and 100),
+  mark       numeric(6,2) check (mark >= 0),
+  max_mark   numeric(6,2) check (max_mark > 0),
+  rank       text check (char_length(rank) <= 40),
+  notes      text check (char_length(notes) <= 1000),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.study_guides (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  course     text not null,
+  topic      text not null,
+  guide      jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+-- ===========================================================================
+-- Money ideas: ranked ways to earn, and a log of hours and earnings.
+-- ===========================================================================
+create table if not exists public.money_ideas (
+  id                    uuid primary key default gen_random_uuid(),
+  user_id               uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  type                  text not null,
+  title                 text not null check (char_length(title) <= 120),
+  summary               text not null default '',
+  effort                smallint not null default 3 check (effort between 1 and 5),
+  startup_cost_cents    integer not null default 0 check (startup_cost_cents >= 0),
+  hours_per_week        numeric(4,1) not null default 2,
+  est_weekly_low_cents  integer not null default 0,
+  est_weekly_high_cents integer not null default 0,
+  assumptions           text not null default '',
+  age_legal_notes       text not null default '',
+  first_steps           jsonb not null default '[]'::jsonb,
+  links                 jsonb not null default '[]'::jsonb,
+  score                 numeric(6,2) not null default 0,
+  status                text not null default 'new' check (status in ('new', 'interested', 'trying', 'done', 'dismissed')),
+  notes                 text not null default '',
+  dedupe_key            text not null,
+  verify                boolean not null default true,
+  created_at            timestamptz not null default now(),
+  unique (user_id, dedupe_key),
+  unique (id, user_id)
+);
+
+create table if not exists public.money_idea_log (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  idea_id      uuid not null,
+  date         date not null,
+  hours        numeric(5,2) not null default 0 check (hours >= 0),
+  earned_cents integer not null default 0 check (earned_cents >= 0),
+  note         text not null default '',
+  created_at   timestamptz not null default now(),
+  foreign key (idea_id, user_id) references public.money_ideas (id, user_id) on delete cascade
+);
+
+do $$
+declare t text;
+begin
+  foreach t in array array['assessments', 'study_guides', 'money_ideas', 'money_idea_log'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t || ': all own', t);
+    execute format('create policy %I on public.%I for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))', t || ': all own', t);
+    execute format('create index if not exists %I on public.%I (user_id)', t || '_user_id_idx', t);
+  end loop;
+end
+$$;

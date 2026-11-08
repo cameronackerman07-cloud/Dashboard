@@ -124,6 +124,16 @@ export const NAV: NavGroup[] = [
           "Adds blocks to your calendar if you want",
         ],
       },
+      {
+        slug: "coach",
+        label: "Coach",
+        short: "Coach",
+        icon: "coach",
+        blurb: "Marks, targets and a plan towards your ATAR",
+        phase: 3,
+        built: true,
+        plans: ["Tracks assessment marks and trends", "Target HSC marks per course", "Topic guides and study methods with sources"],
+      },
     ],
   },
   {
