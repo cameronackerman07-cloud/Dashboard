@@ -5,6 +5,7 @@ import { CalendarConnect } from "@/components/CalendarConnect";
 import { CanvasConnect } from "@/components/CanvasConnect";
 import { GoogleConnect } from "@/components/GoogleConnect";
 import { SpotifyConnect } from "@/components/SpotifyConnect";
+import { WeekSettings } from "@/components/WeekSettings";
 import { spotifyConfigured } from "@/lib/sources/spotify";
 import { listConnections } from "@/lib/oauth-store";
 import { googleConfigured } from "@/lib/sources/google";
@@ -43,11 +44,12 @@ export default async function SettingsPage({ searchParams }: Props) {
   const keyStatus = (env: string) => (process.env[env] ? "Key set" : "Key not set");
 
   const supabase = await createClient();
-  const [profile, calendars, canvas, imported] = await Promise.all([
+  const [profile, calendars, canvas, imported, week] = await Promise.all([
     getProfile(),
     getCalendarConnections(),
     getCanvasStatus(),
     supabase.from("events").select("id", { count: "exact", head: true }).eq("source", IMPORT_SOURCE),
+    supabase.from("user_settings").select("pay_week_start, region").maybeSingle(),
   ]);
 
   // The site's own (Vercel) keys are only shown to the owner; everyone else
@@ -85,6 +87,8 @@ export default async function SettingsPage({ searchParams }: Props) {
       </div>
 
       {profile ? <AccountCard displayName={profile.displayName} email={profile.email} /> : null}
+
+      {profile ? <WeekSettings payWeekStart={(week.data?.pay_week_start as number) ?? 3} town={(week.data?.region as string) ?? ""} /> : null}
 
       <CalendarConnect
         connected={calendars

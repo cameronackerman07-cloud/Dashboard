@@ -59,6 +59,8 @@ Read this before every task. Keep it up to date when decisions change.
 - `components/DueSoon.tsx` — Home's live "Due soon" card. `lib/tasks.ts` — shared task shape +
   `formatDue` (pass `now` only after mount to avoid hydration mismatches).
 - `app/(app)/settings/page.tsx` — Connections screen. Its server actions are `app/(app)/settings/actions.ts`.
+  "Your week" card (`components/WeekSettings.tsx`, `settings/week-actions.ts`): pay-week start + weather town
+  (Open-Meteo geocoding, town only, location rounded) → `user_settings.pay_week_start/region/lat/lng`.
 - Calendar links: `components/CalendarConnect.tsx`. One link per source (`lib/calendar-sources.ts`:
   providers `sentral`, `atlantis`, `ical`), stored encrypted in `connections`. `lib/calendar.ts`
   fetches them server-side (checks in `lib/safe-fetch.ts`: https only, public hosts, checked redirects,

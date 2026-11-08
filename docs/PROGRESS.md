@@ -18,8 +18,8 @@ Update this after every stage. A new session continues from the first unchecked 
   - Part 2 done: assessments + study_guides + money_ideas + money_idea_log tables in agents.sql; lib/coach.ts (weak topics, stale subjects, weighted averages/trend, STUDY_METHODS library with source links — kept in code rather than a study_methods table, coach settings in the school_coach agent config); study agent (daily 16:00, study_focus finding → briefing, pure code); school_coach agent (Monday 16:30 weekly review, pure code); /coach page (target ATAR + honest UAC explanation and links, target marks per course, key-dates roadmap, assessments add/mark/delete, AI topic guides → flashcards, methods library). Not done: weekly link-checking of method sources, guide → planner blocks (use the assistant). Part 3 below.
   - Part 3 done: lib/money-ideas.ts (situation, 13-idea starter catalogue with age/legal notes and official links, no pay rates quoted — jobs say "check the current rate" + Fair Work; service estimates use your own price as a stated assumption; scoring; banned-idea filter; strict AI idea parser); opportunities agent (daily 09:00 re-rank, ≤3 AI ideas a week labelled verify, Saturday-run strategy report + push); ctx.ideas (only writes money_ideas, never status); /money-ideas page (situation, ranked cards, Interested/Trying/Not for me, log hours + optional income entry, Find more like this, Build/Re-rank). Not done: Adzuna jobs API, reading job RSS/web sources, fetching Fair Work pages for live rates, assistant `research_topic` action.
 - [x] Stage L — About me: profile_facts/writing_samples/profile_settings in agents.sql; lib/about-me.ts (sensitive-topic filter, writing-style stats, behaviour facts, questionnaire → confirmed facts, styleGuide), lib/about-me-server.ts (getProfileContext from confirmed facts only; analyseProfile: computed facts + opt-in AI pass on include_in_ai samples, all "suggested", rejected never re-added); about_me agent (Sunday 17:00 → "N new things to review"); /profile page (questionnaire, opt-in switches default off, review/confirm/edit/reject/delete, samples, style stats, Download my data via /api/profile/export, Forget everything); style guide feeds the assistant and The BRIAN headlines. Tests added (37 pass).
-- [ ] Housekeeping — env.example, nav, icons, CLAUDE.md, README, ADDING_AN_AGENT.md, tests, viewport checks, final summary for Cameron
-  - Done so far: .env.example (AGENT_SECRET with how to make it, SMS names), nav (Coach, Money ideas, About me), icons (already there), CLAUDE.md Agents section, README (scheduler, late runs, pg_cron alternative, tests), ADDING_AN_AGENT.md (built-ins, what ctx may write). Tests done: tests/security.test.ts (safe-fetch private addresses incl. hex IPv4-mapped IPv6 — fixed in lib/safe-fetch.ts, OAuth state/return/PKCE, device-token hashing, secret tables have RLS + no policies + revoked grants, every table has RLS, no client code touches secret tables) and tests/tick.test.ts (in-memory tests/fake-db.ts, AI_MOCK, push stubbed via TEST_STUB_PUSH: deadlines clash → finding → The BRIAN alert + briefing → 2 pushes); 46 tests pass. Still to do: Settings card for pay-week start + weather town (user_settings has no UI yet); viewport checks in a browser; "Steps for Cameron".
+- [x] Housekeeping — env.example, nav, icons, CLAUDE.md, README, ADDING_AN_AGENT.md, tests, viewport checks, final summary for Cameron
+  - Done so far: .env.example (AGENT_SECRET with how to make it, SMS names), nav (Coach, Money ideas, About me), icons (already there), CLAUDE.md Agents section, README (scheduler, late runs, pg_cron alternative, tests), ADDING_AN_AGENT.md (built-ins, what ctx may write). Tests done: tests/security.test.ts (safe-fetch private addresses incl. hex IPv4-mapped IPv6 — fixed in lib/safe-fetch.ts, OAuth state/return/PKCE, device-token hashing, secret tables have RLS + no policies + revoked grants, every table has RLS, no client code touches secret tables) and tests/tick.test.ts (in-memory tests/fake-db.ts, AI_MOCK, push stubbed via TEST_STUB_PUSH: deadlines clash → finding → The BRIAN alert + briefing → 2 pushes); 46 tests pass. Settings → "Your week" card added (pay-week start + weather town). Viewport checks NOT done: with no Supabase keys in this build every signed-in page shows the "not connected" screen, so they need a check on the live site (see Steps for Cameron, step 10).
 
 ## How to build here
 The repo is in iCloud and its node_modules folder is empty. Build in a scratch copy:
@@ -31,3 +31,45 @@ Git in the iCloud folder is slow: run commits and pushes in the Terminal panel (
 - IMPORTANT for Cameron: AI now uses each person's own keys. Site (Vercel) keys only work for OWNER_EMAIL, so set OWNER_EMAIL to his email in Vercel (or add his own key in Settings → AI keys).
 - Real SMS (lib/sms.ts) is a stub that stays off even with SMS_ENABLED set: it needs phone verification + encrypted number + caps before it can be switched on, and every Australian SMS provider charges per message and needs sender registration. The free route is the iPhone Shortcut automation (Settings → iPhone & Siri).
 - New tables for Stage K (assessments, study_guides, money_ideas, money_idea_log) are in supabase/agents.sql — Cameron must re-run that file in Supabase.
+
+## Steps for Cameron
+
+Everything in the spec is built. These are the things only you can do, in order. Your site address is shown below as `https://YOUR-SITE.vercel.app`: swap in your real Vercel address.
+
+1. **Run the database file.** Open supabase.com → your project → **SQL Editor** → **New query**. Open `supabase/schema.sql` in this repo, copy all of it, paste it in, press **Run**. Then do the same with `supabase/agents.sql`. Both are safe to run again; run `agents.sql` again whenever it changes.
+
+2. **Make the secrets and put them in Vercel.** In a terminal, in the `dashboard` folder:
+   - `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` gives you `TOKEN_ENCRYPTION_KEY`. **Save a copy in a password manager.** If you lose it, every saved AI key and connection becomes unreadable and everyone has to add them again.
+   - `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` gives you `AGENT_SECRET`.
+   - `npm run vapid` prints `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`.
+   - Go to Vercel → your project → **Settings → Environment Variables** and add: `TOKEN_ENCRYPTION_KEY`, `AGENT_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:` followed by your email), `SITE_URL` (`https://YOUR-SITE.vercel.app`, no slash at the end), `OWNER_EMAIL` (the email you sign in with), `SHARED_AI_FOR_FRIENDS` (`off`), `INVITE_CODE` (a word only your friends know), plus the Google and Spotify values from steps 3 and 4. Don't add `AI_MOCK` in Vercel.
+   - Then **Deployments → ⋯ on the newest one → Redeploy**, so the site picks the new values up.
+
+3. **Google.** Go to console.cloud.google.com → APIs & Services → **Credentials** → your OAuth client. Under **Authorised redirect URIs** add `https://YOUR-SITE.vercel.app/api/google/callback` and `http://localhost:3000/api/google/callback`. Copy the Client ID and secret into Vercel as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. On **OAuth consent screen**, set it to **In production**. If you leave it on "Testing", connections stop working after 7 days. Google will say the app is "unverified". That's fine for you and a few friends: on the warning, tap **Advanced → Go to (site name)**. Your school's Google account might be blocked by the school. If it is, share your school calendar to your personal Google account and connect that one instead.
+
+4. **Spotify.** Go to developer.spotify.com/dashboard → **Create app**. Pick **Web API**. Add the redirect URIs `https://YOUR-SITE.vercel.app/api/spotify/callback` and `http://127.0.0.1:3000/api/spotify/callback` (Spotify won't accept "localhost"). Put the Client ID and secret in Vercel as `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`. Spotify's current rules for apps in development mode: you (the owner) need Spotify **Premium**, at most **5** people can use it, and you must add each friend's Spotify email under the app's **User Management** before they connect.
+
+5. **Turn on the 30-minute scheduler (GitHub).**
+   - On github.com open your Dashboard repo → **Settings → Secrets and variables → Actions → New repository secret**. Add `SITE_URL` (same as in Vercel) and `AGENT_SECRET` (the same value as in Vercel).
+   - Then click **Add file → Create new file**, name it `.github/workflows/agents-tick.yml`, paste in everything from `docs/github/agents-tick.yml`, and **Commit**.
+   - To check it ran: open the **Actions** tab. You should see "agents-tick" runs with green ticks, and AI Agents in the dashboard shows "last run" times. GitHub can start runs 5–30 minutes late.
+
+6. **Set up your iPhone.**
+   - Open the site in **Safari** → Share → **Add to Home Screen**, then open it from the new icon.
+   - In the app, go to Settings → **Notifications** → **Turn on**, allow notifications, then press **Send a test**.
+   - Go to Settings → **iPhone & Siri** → **Create a token**. Copy it right away; it's only shown once.
+   - Build the Shortcuts by following the recipes on that page. For the **Wednesday text**: Shortcuts app → Automation → New → Time of Day → Wednesday 7:00 → run the "cleaner hours" recipe → Send Message → turn off "Ask before running".
+   - **Apple Calendar:** on that same page, tap the webcal link on your iPhone and iPad, or scan the QR code. On your MacBook, open Calendar → File → New Calendar Subscription and paste the link.
+
+7. **What to send a friend:** the site link, your invite code, and this: "Make an account, then go to Settings → AI keys and add your own free key. Gemini at aistudio.google.com or Groq at console.groq.com are easiest." For Spotify, also ask for their Spotify email and add it as in step 4.
+
+8. **Fill in your own details in the app:**
+   - Settings → **Your week**: pay-week start day and your town (for the weather).
+   - **Shifts** → edit the cleaning job and tick **Weekly hours report**.
+   - **Coach**: your ATAR target, target marks per course, and key dates and assessments.
+   - **Money ideas**: your situation (age, town, hours free, skills, transport, budget, goal).
+   - **About me**: the questions. Learning switches stay off unless you turn them on.
+
+9. **Honest limits.** Scheduled runs can be late, so use the Shortcuts automation when a text has to go at an exact time. Real SMS is off and would cost money per message. Free AI quotas belong to each person's own account. iPhone notifications only work from the installed Home Screen app. Earnings and ATAR figures are estimates, not promises. Scheduled agents only read and report. They never send, buy, apply for or change anything.
+
+10. **Quick look on your devices.** After step 2, sign in on your iPhone, iPad and MacBook. Open Home, Inbox, AI Agents, Calendar, Planner, Pay, Coach, Money ideas, About me and each Settings page. Tell Claude about anything that's cut off, needs sideways scrolling, or is hard to tap. This couldn't be checked automatically, because the test copy has no database keys.
