@@ -6,6 +6,9 @@ import "server-only";
 //
 // Keys live in Vercel env vars (any one of these switches the AI features on):
 //   GEMINI_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY, MISTRAL_API_KEY, CEREBRAS_API_KEY
+// Providers without a key are skipped. Free model names change often, so each
+// provider's first model can be overridden without a code change:
+//   GEMINI_MODEL, GROQ_MODEL, OPENROUTER_MODEL (a ":free" model), MISTRAL_MODEL
 //
 // The picker also lists every other chat model each provider says your key can
 // use (see discoverModels), so new models show up without code changes. Model IDs
@@ -47,6 +50,8 @@ type ProviderId = "gemini" | "groq" | "openrouter" | "mistral" | "cerebras";
 type Provider = {
   name: string;
   envKey: string;
+  modelEnv?: string; // optional env var naming a model to try first
+
   url: string; // chat completions
   modelsUrl: string; // list of models
 };
@@ -55,24 +60,28 @@ const PROVIDERS: Record<ProviderId, Provider> = {
   gemini: {
     name: "Gemini",
     envKey: "GEMINI_API_KEY",
+    modelEnv: "GEMINI_MODEL",
     url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
     modelsUrl: "https://generativelanguage.googleapis.com/v1beta/openai/models",
   },
   groq: {
     name: "Groq",
     envKey: "GROQ_API_KEY",
+    modelEnv: "GROQ_MODEL",
     url: "https://api.groq.com/openai/v1/chat/completions",
     modelsUrl: "https://api.groq.com/openai/v1/models",
   },
   openrouter: {
     name: "OpenRouter",
     envKey: "OPENROUTER_API_KEY",
+    modelEnv: "OPENROUTER_MODEL",
     url: "https://openrouter.ai/api/v1/chat/completions",
     modelsUrl: "https://openrouter.ai/api/v1/models",
   },
   mistral: {
     name: "Mistral",
     envKey: "MISTRAL_API_KEY",
+    modelEnv: "MISTRAL_MODEL",
     url: "https://api.mistral.ai/v1/chat/completions",
     modelsUrl: "https://api.mistral.ai/v1/models",
   },
@@ -235,8 +244,32 @@ async function discover(provider: ProviderId): Promise<Model[]> {
   return models;
 }
 
+// A model named in GEMINI_MODEL etc. goes in front of that provider's others.
+function envModels(): Model[] {
+  const out: Model[] = [];
+  for (const provider of Object.keys(PROVIDERS) as ProviderId[]) {
+    const env = PROVIDERS[provider].modelEnv;
+    const apiModel = env ? process.env[env]?.trim() : undefined;
+    if (!apiModel || !/^[\w.:/-]{1,120}$/.test(apiModel)) continue;
+    out.push({ id: `${provider}:${apiModel}`, provider, apiModel, label: prettyName(apiModel), vision: provider === "gemini" });
+  }
+  return out;
+}
+
+function recommendedModels(): Model[] {
+  const fromEnv = envModels();
+  const list: Model[] = [];
+  for (const m of MODELS) {
+    for (const e of fromEnv) {
+      if (e.provider === m.provider && !list.includes(e)) list.push(e);
+    }
+    if (!fromEnv.some((e) => e.provider === m.provider && e.apiModel === m.apiModel)) list.push(m);
+  }
+  return list.filter((m) => keyFor(m.provider));
+}
+
 async function allModels(): Promise<{ recommended: Model[]; extra: Model[] }> {
-  const recommended = MODELS.filter((m) => keyFor(m.provider));
+  const recommended = recommendedModels();
   const providers = (Object.keys(PROVIDERS) as ProviderId[]).filter((p) => keyFor(p));
   const lists = await Promise.all(providers.map(discover));
 
@@ -289,6 +322,7 @@ export async function aiChat(
     temperature?: number;
     model?: string; // a picker id; anything else means Auto
     needsVision?: boolean;
+    budgetMs?: number; // total time allowed across every model tried
   } = {},
 ): Promise<AiResult> {
   const { recommended, extra } = await allModels();
@@ -310,7 +344,7 @@ export async function aiChat(
     : messages;
 
   const failures: string[] = [];
-  const deadline = Date.now() + TOTAL_BUDGET_MS;
+  const deadline = Date.now() + Math.min(opts.budgetMs ?? TOTAL_BUDGET_MS, TOTAL_BUDGET_MS * 5);
 
   for (const model of ordered) {
     const remaining = deadline - Date.now();
@@ -355,11 +389,63 @@ export async function aiChat(
     }
   }
 
+  const allLimited = failures.length > 0 && failures.every((f) => f.endsWith(reasonFor(429)));
   throw new AiError(
-    failures.length
-      ? `No model could answer. ${failures.join("; ")}.`
-      : "No model could answer in time. Try again.",
+    allLimited
+      ? "Every free AI model has hit its limit for now. Try again in a few minutes."
+      : failures.length
+        ? `No model could answer. ${failures.join("; ")}.`
+        : "No model could answer in time. Try again.",
   );
+}
+
+// ---------------------------------------------------------------------------
+// JSON answers
+// ---------------------------------------------------------------------------
+
+// Pulls a JSON object out of a model's reply: strips ```json fences and any
+// chatter before or after the outermost { ... }.
+export function extractJson(text: string): unknown {
+  const unfenced = text.replace(/```(?:json)?/gi, "").trim();
+  const start = unfenced.indexOf("{");
+  const end = unfenced.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new SyntaxError("no JSON object");
+  return JSON.parse(unfenced.slice(start, end + 1));
+}
+
+// Asks for a JSON object and checks it with `parse` (return null if it's not
+// right). A bad reply gets one retry, on the same model, asking it to fix it.
+export async function aiJson<T>(
+  messages: AiMessage[],
+  parse: (value: unknown) => T | null,
+  opts: Parameters<typeof aiChat>[1] = {},
+): Promise<{ value: T; result: AiResult }> {
+  const first = await aiChat(messages, { temperature: 0.2, ...opts });
+  const tryParse = (text: string): T | null => {
+    try {
+      return parse(extractJson(text));
+    } catch {
+      return null;
+    }
+  };
+  const value = tryParse(first.text);
+  if (value !== null) return { value, result: first };
+
+  console.error(`AI: ${first.modelLabel} sent JSON that didn't parse; retrying once`);
+  const retry = await aiChat(
+    [
+      ...messages,
+      { role: "assistant", content: first.text.slice(0, 20_000) },
+      {
+        role: "user",
+        content: "That wasn't valid JSON in the shape asked for. Reply again with ONLY the JSON object, no other text.",
+      },
+    ],
+    { temperature: 0, ...opts, model: first.modelId },
+  );
+  const fixed = tryParse(retry.text);
+  if (fixed !== null) return { value: fixed, result: retry };
+  throw new AiError(`${retry.modelLabel} didn't send its answer in the right format. Try again, or pick a different model.`);
 }
 
 // A message for the student from anything aiChat throws.

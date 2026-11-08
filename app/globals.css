@@ -616,3 +616,62 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   .dot-btn { width: 44px; }
   .week-nav .btn { padding: 0 12px; }
 }
+
+/* ---------- Summaries ---------- */
+.privacy-note { font-size: 13px; font-weight: 500; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; }
+.file-drop {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; cursor: pointer;
+  border: 1.5px dashed var(--line-strong); border-radius: var(--radius-sm); padding: 18px 16px; min-height: 64px;
+}
+.file-drop:hover, .file-drop:focus-within { border-color: var(--ink); background: var(--surface-2); }
+.file-drop-main { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.summary-sections { display: flex; flex-direction: column; gap: 14px; }
+.summary-heading { font-size: 14px; font-weight: 700; margin: 0 0 4px; }
+.summary-points { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; line-height: 1.5; }
+.upload { border-bottom: 1px solid var(--line-soft); }
+.upload:last-child { border-bottom: 0; }
+.upload summary { display: flex; flex-direction: column; gap: 2px; padding: 12px 0; cursor: pointer; min-height: 44px; list-style: none; }
+.upload summary::-webkit-details-marker { display: none; }
+.upload[open] summary .task-title { text-decoration: underline; }
+.upload-body { display: flex; flex-direction: column; gap: 12px; padding: 0 0 16px; }
+
+/* ---------- Flashcards ---------- */
+.study-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+.fc-progress { height: 4px; border-radius: 2px; background: var(--line-soft); overflow: hidden; }
+.fc-progress > div { height: 100%; background: var(--ink); transition: width 0.2s; }
+.fc-left { margin-left: auto; }
+.fc-face {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px; text-align: left;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 22px 18px; min-height: 140px;
+  font: inherit; color: var(--ink); cursor: pointer;
+}
+.fc-face:disabled { cursor: default; }
+.fc-face:not(:disabled):hover { border-color: var(--ink); }
+.fc-show { min-height: 52px; }
+.fc-done { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 12px 0; }
+.fc-tree { display: flex; flex-direction: column; }
+.fc-subject { border-bottom: 1px solid var(--line-soft); }
+.fc-subject:last-child { border-bottom: 0; }
+.fc-subject > summary, .fc-module > summary {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px;
+  cursor: pointer; min-height: 48px; padding: 12px 0; list-style: none;
+}
+.fc-subject > summary::-webkit-details-marker, .fc-module > summary::-webkit-details-marker { display: none; }
+.fc-subject > summary .fc-node-name { font-size: 15px; font-weight: 700; }
+.fc-subject > summary .fc-node-name::before, .fc-module > summary .fc-node-name::before { content: "▸ "; color: var(--muted); }
+.fc-subject[open] > summary .fc-node-name::before, .fc-module[open] > summary .fc-node-name::before { content: "▾ "; }
+.fc-module { margin-left: 16px; border-top: 1px solid var(--line-soft); }
+.fc-module > summary .fc-node-name { font-size: 14px; font-weight: 600; }
+.fc-group-actions { margin: 0 0 10px; }
+.fc-topics { margin-left: 16px; display: flex; flex-direction: column; }
+.fc-topic { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 0; border-top: 1px solid var(--line-soft); }
+.fc-topic .task-body { flex: 1 1 180px; }
+.fc-counts { white-space: nowrap; }
+.fc-edit { padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+@media (max-width: 760px) {
+  .fc-rates { grid-template-columns: repeat(2, 1fr); }
+  .fc-rate { min-height: 60px; }
+  .study-buttons .btn { flex: 1 1 100%; }
+  .fc-module { margin-left: 8px; }
+  .fc-topics { margin-left: 8px; }
+}

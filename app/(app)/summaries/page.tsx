@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { AiNotice } from "@/components/AiNotice";
 import { PageHeader } from "@/components/PageHeader";
-import { COURSES } from "@/lib/nav";
 import { aiConfigured, availableModels } from "@/lib/ai";
-import { SummariesClient } from "./SummariesClient";
+import type { SummarySection } from "@/lib/summarise";
+import { createClient } from "@/lib/supabase/server";
+import { formatShortDate } from "@/lib/time";
+import { SummariesClient, type PastUpload } from "./SummariesClient";
 
 export const metadata: Metadata = { title: "Summaries" };
 export const dynamic = "force-dynamic";
@@ -11,15 +13,46 @@ export const maxDuration = 60;
 
 export default async function SummariesPage() {
   const enabled = aiConfigured();
+  const supabase = await createClient();
+  const [{ data }, models] = await Promise.all([
+    supabase
+      .from("uploads")
+      .select("id, title, subject, filename, summary, card_count, truncated, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50),
+    enabled ? availableModels() : Promise.resolve([]),
+  ]);
+
+  const history: PastUpload[] = (data ?? []).map(
+    (u: {
+      id: string;
+      title: string;
+      subject: string | null;
+      filename: string | null;
+      summary: { sections?: SummarySection[] } | null;
+      card_count: number;
+      truncated: boolean;
+      created_at: string;
+    }) => ({
+      id: u.id,
+      title: u.title,
+      subject: u.subject,
+      filename: u.filename,
+      sections: u.summary?.sections ?? [],
+      cardCount: u.card_count,
+      truncated: u.truncated,
+      date: formatShortDate(new Date(u.created_at).getTime()),
+    }),
+  );
 
   return (
     <main className="main main-narrow">
       <PageHeader
         icon="summaries"
         title="Summaries"
-        lede="Paste notes or a worksheet and get a short summary with key points — then save it straight to your Notes."
+        lede="Upload notes, a worksheet or a textbook chapter. You get a summary, and it's turned into flashcards automatically."
       />
-      {enabled ? <SummariesClient courses={COURSES} models={await availableModels()} /> : <AiNotice />}
+      {enabled ? <SummariesClient models={models} history={history} /> : <AiNotice />}
     </main>
   );
 }

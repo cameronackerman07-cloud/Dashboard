@@ -50,3 +50,17 @@ export function intervalLabel(schedule: Schedule): string {
   if (days === 0) return `${AGAIN_MINUTES} min`;
   return days === 1 ? "1 day" : `${days} days`;
 }
+
+// The question text used to spot duplicates: lowercase, no punctuation, single
+// spaces. supabase/schema.sql backfills old cards the same way.
+export function normKey(front: string): string {
+  return front
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 500);
+}
+
+// Cards with no module or topic are filed under this.
+export const GENERAL = "General";
