@@ -128,7 +128,7 @@ export function AssignmentsClient({ tasks, courses }: { tasks: Task[]; courses: 
 
         {optimisticTasks.length === 0 ? (
           <p className="track-empty">
-            Nothing here yet. Add your first task above — Canvas, Classroom and Compass tasks
+            Nothing here yet. Add your first task above — Canvas and Classroom tasks
             will show up here automatically once those are connected.
           </p>
         ) : (

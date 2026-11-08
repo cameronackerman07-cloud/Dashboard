@@ -759,3 +759,15 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   .agent-label { max-width: 72px; font-size: 11px; }
   .brian-node { width: 38%; }
 }
+
+/* ---------- Calendar week / agenda ---------- */
+.cal-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.cal-weeknav { gap: 12px; }
+.cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.cal-week .cal-day { padding: 12px; gap: 8px; }
+.cal-week .cal-row { flex-direction: column; align-items: flex-start; gap: 2px; }
+.cal-week .row-slot { width: auto; }
+.cal-agenda { display: flex; flex-direction: column; gap: 16px; }
+.btn.is-disabled { opacity: 0.55; pointer-events: none; }
+@media (max-width: 1100px) { .cal-week { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); } }
+@media (max-width: 760px) { .cal-week { grid-template-columns: 1fr; } }

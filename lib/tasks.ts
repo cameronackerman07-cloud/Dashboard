@@ -56,7 +56,6 @@ export function formatDue(
 const SOURCE_LABELS: Record<string, string> = {
   canvas: "Canvas",
   classroom: "Google Classroom",
-  compass: "Compass",
   todo: "To-do",
 };
 

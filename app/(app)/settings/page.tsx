@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 import { AccountCard } from "@/components/AccountCard";
 import { CalendarConnect } from "@/components/CalendarConnect";
 import { CanvasConnect } from "@/components/CanvasConnect";
+import { GoogleConnect } from "@/components/GoogleConnect";
+import { listConnections } from "@/lib/oauth-store";
+import { googleConfigured } from "@/lib/sources/google";
 import { Icon, type IconName } from "@/components/Icon";
 import { getCalendarConnections, IMPORT_SOURCE } from "@/lib/calendar";
 import { getCanvasStatus } from "@/lib/canvas";
@@ -14,12 +17,6 @@ import { formatShortDate } from "@/lib/time";
 export const metadata: Metadata = { title: "Settings & connections" };
 
 type Row = { name: string; desc: string; action: string; icon: IconName };
-
-const SCHOOL: Row[] = [
-  { name: "Google — personal", desc: "Calendar, Drive and Google Classroom", action: "Connect", icon: "google" },
-  { name: "Google — school", desc: "Add a second account. If your school blocks it, share the calendar to your personal account instead.", action: "Connect", icon: "google" },
-  { name: "Compass", desc: "For now, paste its calendar link into the calendar card above, under Other link", action: "Add link", icon: "link" },
-];
 
 const DEVICES: Row[] = [
   { name: "Siri & Shortcuts", desc: "“Hey Siri, what’s due?” and Reminders sync", action: "Get Shortcut", icon: "mic" },
@@ -57,7 +54,19 @@ function ConnectionList({ rows }: { rows: Row[] }) {
   );
 }
 
-export default async function SettingsPage() {
+type Props = { searchParams: Promise<{ google?: string }> };
+
+const GOOGLE_NOTICE: Record<string, string> = {
+  connected: "Google connected.",
+  cancelled: "No problem: nothing was connected.",
+  blocked: "Your school may block this. Ask your school to allow it, or share your school calendar to your personal Google account and connect that instead.",
+  expired: "That took too long. Press Connect Google again.",
+  failed: "Google didn't finish connecting. Try again.",
+  "not-set-up": "Google isn't set up on this site yet.",
+};
+
+export default async function SettingsPage({ searchParams }: Props) {
+  const { google } = await searchParams;
   // Server-side check only: shows whether a key exists, never the key itself.
   const keyStatus = (env: string) => (process.env[env] ? "Key set" : "Key not set");
 
@@ -113,6 +122,12 @@ export default async function SettingsPage() {
         importedCount={imported.count ?? 0}
       />
 
+      <GoogleConnect
+        accounts={profile ? await listConnections(profile.id, "google") : []}
+        configured={googleConfigured()}
+        notice={google ? (GOOGLE_NOTICE[google] ?? null) : null}
+      />
+
       <CanvasConnect
         state={
           canvas
@@ -125,11 +140,6 @@ export default async function SettingsPage() {
             : null
         }
       />
-
-      <section style={{ display: "flex", flexDirection: "column", gap: 10 }} aria-label="School and Google">
-        <h2 className="section-label">School &amp; Google</h2>
-        <ConnectionList rows={SCHOOL} />
-      </section>
 
       <section style={{ display: "flex", flexDirection: "column", gap: 10 }} aria-label="iPhone and apps">
         <h2 className="section-label">iPhone &amp; apps</h2>

@@ -57,7 +57,7 @@ function Steps({ source }: { source: CalendarSource }) {
   }
   return (
     <ol>
-      <li>Any calendar that gives you an iCal or .ics link works: Compass, Google Calendar, Outlook, Edval.</li>
+      <li>Any calendar that gives you an iCal or .ics link works: Google Calendar, Outlook, Edval and others.</li>
       <li>Copy its private or secret iCal address and paste it below.</li>
     </ol>
   );

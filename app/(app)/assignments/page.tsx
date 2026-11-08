@@ -9,7 +9,7 @@ import { AssignmentsClient, type Task } from "./AssignmentsClient";
 export const metadata: Metadata = { title: "Assignments" };
 
 // Combined due-date tracker: your own tasks plus Canvas work (source "canvas"),
-// synced from lib/canvas.ts. Google Classroom and Compass can feed the same table later.
+// synced from lib/canvas.ts. Google Classroom items are tracked in external_items by the Assignments agent.
 export default async function AssignmentsPage() {
   // Pull in new Canvas work first, if the last sync is over 30 minutes old.
   const sync = await syncCanvas({ maxAgeMs: AUTO_SYNC_MS });

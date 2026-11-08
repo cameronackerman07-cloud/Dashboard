@@ -1,7 +1,7 @@
 # Dashboard
 
 A free, black-and-white school and personal dashboard: timetable, assignments from Canvas /
-Google Classroom / Compass, HSC practice with AI marking, flashcards, a study planner, AI agents,
+Google Classroom, HSC practice with AI marking, flashcards, a study planner, AI agents,
 and personal tools — installable on iPhone.
 
 ## Run it on your computer (optional)

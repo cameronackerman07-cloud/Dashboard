@@ -155,7 +155,7 @@ Physics · VET Entertainment · English Standard  (see `COURSES` in `lib/nav.ts`
   school's admin — show a clear message suggesting sharing the school calendar to the personal account.
   The OAuth app must be published "In production" (unverified is fine) so refresh tokens don't expire
   after 7 days.
-- **Compass / Atlantis Timetable / Sentral**: no public API — use their calendar subscription (.ics)
+- **Atlantis Timetable / Sentral** (Compass support was removed): no public API — use their calendar subscription (.ics)
   links, an .ics file, or the Timetable paste importer. Never store school passwords.
 - **Apple Calendar**: expose a private, unguessable `.ics` feed URL of the dashboard's calendar.
 - **Apple Reminders / Siri**: provide an iOS Shortcut that calls a JSON endpoint

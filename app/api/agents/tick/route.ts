@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runDueForUser, STOP_STARTING_AFTER_MS } from "@/lib/agents/engine";
 import { bearerMatches } from "@/lib/bearer";
+import { syncGoogle } from "@/lib/sources/google";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
 
 // Called every 30 minutes by .github/workflows/agents-tick.yml (or Supabase
@@ -48,6 +49,14 @@ async function tick(request: Request) {
       totals.errors++;
     }
   }
+  // Refresh Google accounts not synced in the last 30 minutes, while time allows.
+  const { data: googleUsers } = await db.from("oauth_connections").select("user_id").eq("provider", "google").eq("status", "active").limit(2000);
+  let synced = 0;
+  for (const userId of new Set<string>((googleUsers ?? []).map((r: { user_id: string }) => r.user_id))) {
+    if (Date.now() - started > STOP_STARTING_AFTER_MS) break;
+    synced += (await syncGoogle(userId, { olderThanMs: 25 * 60_000 }).catch(() => [])).length;
+  }
+  Object.assign(totals, { googleSynced: synced });
   console.log(`Agents tick: ${JSON.stringify(totals)}`);
   return NextResponse.json({ ok: true, ...totals });
 }

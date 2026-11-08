@@ -36,7 +36,7 @@ export const NAV: NavGroup[] = [
         built: true,
         plans: [
           "Merges your personal and school Google calendars",
-          "Adds Canvas, Compass and Atlantis events from their calendar links",
+          "Adds Canvas and Atlantis events from their calendar links",
           "Shows which account each event came from",
           "Gives you a link to subscribe from Apple Calendar on your iPhone",
         ],
@@ -69,7 +69,7 @@ export const NAV: NavGroup[] = [
         phase: 1,
         built: true,
         plans: [
-          "Combines tasks from Canvas, Google Classroom and Compass",
+          "Combines tasks from Canvas and Google Classroom",
           "Sorts by due date and subject",
           "Lets you tick tasks off and add your own",
           "An AI agent checks for new tasks and adds them to your study plan",

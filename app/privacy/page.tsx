@@ -30,7 +30,7 @@ export default function PrivacyPage() {
           When the owner connects a Google account, Dashboard asks for read-only access to Google Calendar, Google
           Classroom (courses and the owner&apos;s own coursework) and Google Drive. It uses this only to show the
           owner&apos;s own events, assignments and files inside the dashboard. It also reads calendar links and
-          tokens the owner adds for school apps such as Canvas, Compass and Atlantis Timetable.
+          tokens the owner adds for school apps such as Canvas, Google and Atlantis Timetable.
         </p>
       </section>
 

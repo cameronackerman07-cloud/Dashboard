@@ -214,3 +214,37 @@ begin
   end loop;
 end
 $$;
+
+-- ===========================================================================
+-- Google and Spotify accounts. Refresh tokens are encrypted; RLS ON with NO
+-- policies, so the browser can never read this table. (The older `connections`
+-- table in schema.sql keeps Canvas and calendar links.)
+-- ===========================================================================
+create table if not exists public.oauth_connections (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references auth.users (id) on delete cascade,
+  provider       text not null check (provider in ('google', 'spotify')),
+  label          text not null default 'Personal',
+  account_hint   text,
+  scopes         text[] not null default '{}',
+  ciphertext     text not null,
+  iv             text not null,
+  auth_tag       text not null,
+  key_version    integer not null default 1,
+  status         text not null default 'active' check (status in ('active', 'needs_reconnect', 'blocked')),
+  cached         jsonb not null default '{}'::jsonb,   -- e.g. Google Calendar events from the last sync
+  last_error     text,
+  last_synced_at timestamptz,
+  created_at     timestamptz not null default now()
+);
+create index if not exists oauth_connections_user_idx on public.oauth_connections (user_id, provider);
+alter table public.oauth_connections enable row level security;
+do $$
+declare p record;
+begin
+  for p in select policyname from pg_policies where schemaname = 'public' and tablename = 'oauth_connections' loop
+    execute format('drop policy %I on public.oauth_connections', p.policyname);
+  end loop;
+end
+$$;
+revoke all on public.oauth_connections from anon, authenticated;
