@@ -23,6 +23,12 @@ export function isPrivateAddress(address: string): boolean {
     );
   }
   const v6 = address.toLowerCase();
+  // IPv4-mapped addresses written in hex (::ffff:7f00:1 is 127.0.0.1).
+  const mapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(v6);
+  if (mapped) {
+    const [hi, lo] = [parseInt(mapped[1], 16), parseInt(mapped[2], 16)];
+    return isPrivateAddress(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`);
+  }
   return (
     v6 === "::" ||
     v6 === "::1" ||
