@@ -26,7 +26,10 @@ export async function addJob(form: FormData): Promise<Reply> {
   if (!(await currentUserId())) return SIGNED_OUT;
 
   const supabase = await createClient();
-  const { error } = await supabase.from("jobs").insert({ name, default_rate_cents: rate, kind });
+  const row = { name, default_rate_cents: rate, kind };
+  let { error } = await supabase.from("jobs").insert({ ...row, weekly_hours_report: form.get("weekly_hours_report") === "on" });
+  // agents.sql not run yet: save without the weekly-report flag.
+  if (error?.message.includes("weekly_hours_report")) ({ error } = await supabase.from("jobs").insert(row));
   if (error) return SAVE_FAILED;
   refresh();
   return { ok: true, message: `Added ${name}.` };
@@ -42,7 +45,9 @@ export async function updateJob(id: string, form: FormData): Promise<Reply> {
   if (!isJobKind(kind)) return { ok: false, message: "Pick what kind of job it is." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("jobs").update({ name, default_rate_cents: rate, kind }).eq("id", id);
+  const row = { name, default_rate_cents: rate, kind };
+  let { error } = await supabase.from("jobs").update({ ...row, weekly_hours_report: form.get("weekly_hours_report") === "on" }).eq("id", id);
+  if (error?.message.includes("weekly_hours_report")) ({ error } = await supabase.from("jobs").update(row).eq("id", id));
   if (error) return SAVE_FAILED;
   refresh();
   return { ok: true, message: "Job saved." };

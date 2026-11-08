@@ -285,6 +285,10 @@ function JobsCard({ jobs }: { jobs: Job[] }) {
           </option>
         ))}
       </select>
+      <label className="paste-replace">
+        <input type="checkbox" name="weekly_hours_report" defaultChecked={!!job?.weekly_hours_report} />
+        <span>Send me a weekly hours report for this job</span>
+      </label>
     </>
   );
 
@@ -321,6 +325,7 @@ function JobsCard({ jobs }: { jobs: Job[] }) {
                   <span className="task-title">{job.name}</span>
                   <span className="task-sub">
                     {formatCents(job.default_rate_cents)}/h · {JOB_KINDS.find((k) => k.value === job.kind)?.label}
+                    {job.weekly_hours_report ? " · Weekly hours report" : ""}
                   </span>
                 </div>
                 <div className="row-actions">

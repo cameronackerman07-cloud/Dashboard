@@ -81,8 +81,12 @@ export type AgentContext = {
     writeReport: (r: NewReport) => Promise<string | null>;
     push: (msg: { title: string; body: string; url: string; category: "briefing" | "alerts" | "cleaning" | "money" | "school"; importance?: number }) => Promise<void>;
     agentName: (agentId: string) => string;
-    settings: () => Promise<{ lat: number | null; lng: number | null; region: string | null }>;
+    settings: () => Promise<{ lat: number | null; lng: number | null; region: string | null; payWeekStart: number }>;
   };
+  // Which sources are connected (yes/no only — never tokens).
+  connections: () => Promise<{ canvas: boolean; classroom: boolean }>;
+  // Agents may keep their own copy of school items (external_items) — nothing else is written.
+  upsertExternal: (rows: { source: "canvas" | "classroom"; external_id: string; title: string; course: string | null; due_at: string | null; url: string | null; status: string | null }[]) => Promise<void>;
 };
 
 export type ReportKind = "briefing" | "sunday_reset" | "alert" | "strategy" | "cleaning_hours" | "custom";

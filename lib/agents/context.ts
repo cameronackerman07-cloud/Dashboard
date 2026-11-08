@@ -29,7 +29,7 @@ export async function readSource(db: Db, userId: string, source: SourceId, agent
   switch (source) {
     case "assignments": {
       const [tasks, external] = await Promise.all([
-        safe(db.from("tasks").select("id, title, course, source, due_at, done").eq("user_id", userId).eq("done", false).order("due_at", { ascending: true }).limit(200), []),
+        safe(db.from("tasks").select("id, title, course, source, external_id, due_at, done").eq("user_id", userId).eq("done", false).order("due_at", { ascending: true }).limit(200), []),
         safe(db.from("external_items").select("id, source, external_id, title, course, due_at, status").eq("user_id", userId).order("due_at", { ascending: true }).limit(300), []),
       ]);
       return { tasks, external };
@@ -38,7 +38,7 @@ export async function readSource(db: Db, userId: string, source: SourceId, agent
       return safe(db.from("todos").select("id, title, due_on, subject, priority").eq("user_id", userId).eq("done", false).limit(300), []);
     case "shifts": {
       const [jobs, shifts] = await Promise.all([
-        safe(db.from("jobs").select("id, name, default_rate_cents, kind").eq("user_id", userId), []),
+        safe(db.from("jobs").select("*").eq("user_id", userId), []),
         safe(
           db
             .from("shifts")
@@ -221,9 +221,27 @@ export function buildContext(
       },
       agentName: (id) => opts.agentNames.get(id) ?? "An agent",
       settings: async () => {
-        const row = await safe(db.from("user_settings").select("lat, lng, region").eq("user_id", userId).maybeSingle(), null as { lat: number | null; lng: number | null; region: string | null } | null);
-        return { lat: row?.lat ?? null, lng: row?.lng ?? null, region: row?.region ?? null };
+        const row = await safe(
+          db.from("user_settings").select("lat, lng, region, pay_week_start").eq("user_id", userId).maybeSingle(),
+          null as { lat: number | null; lng: number | null; region: string | null; pay_week_start: number | null } | null,
+        );
+        return { lat: row?.lat ?? null, lng: row?.lng ?? null, region: row?.region ?? null, payWeekStart: row?.pay_week_start ?? 3 };
       },
+    },
+    connections: async () => {
+      const [canvas, google] = await Promise.all([
+        safe(db.from("connections").select("id").eq("user_id", userId).eq("provider", "canvas").limit(1), [] as { id: string }[]),
+        safe(db.from("oauth_connections").select("scopes").eq("user_id", userId).eq("provider", "google"), [] as { scopes: string[] | null }[]),
+      ]);
+      return { canvas: canvas.length > 0, classroom: google.some((g) => (g.scopes ?? []).includes("classroom")) };
+    },
+    upsertExternal: async (rows) => {
+      const now = iso(Date.now());
+      for (let i = 0; i < rows.length; i += 100) {
+        await db
+          .from("external_items")
+          .upsert(rows.slice(i, i + 100).map((r) => ({ ...r, title: r.title.slice(0, 300), user_id: userId, last_seen_at: now })), { onConflict: "user_id,source,external_id" });
+      }
     },
     ai: async ({ messages, system, json, purpose }) => {
       if (!opts.aiAvailable) throw new AiError("Add a free AI key in Settings to use this agent.");

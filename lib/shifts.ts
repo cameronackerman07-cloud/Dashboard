@@ -15,7 +15,7 @@ export function isJobKind(value: unknown): value is JobKind {
   return JOB_KINDS.some((k) => k.value === value);
 }
 
-export type Job = { id: string; name: string; default_rate_cents: number; kind: JobKind };
+export type Job = { id: string; name: string; default_rate_cents: number; kind: JobKind; weekly_hours_report?: boolean };
 
 export type Shift = {
   id: string;

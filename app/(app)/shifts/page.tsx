@@ -19,7 +19,7 @@ export default async function ShiftsPage({ searchParams }: Props) {
 
   const supabase = await createClient();
   const [{ data: jobs }, { data: shifts }, { data: logged }] = await Promise.all([
-    supabase.from("jobs").select("id, name, default_rate_cents, kind").order("created_at", { ascending: true }),
+    supabase.from("jobs").select("*").order("created_at", { ascending: true }),
     supabase
       .from("shifts")
       .select("id, job_id, starts_at, ends_at, unpaid_break_minutes, rate_override_cents, notes")
