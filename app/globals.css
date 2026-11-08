@@ -541,3 +541,11 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   .paste-row > :nth-child(4) { grid-area: 3 / 2; }
   .paste-row > :nth-child(6) { grid-area: 3 / 3; }
 }
+
+/* Login: Sign in / Create account */
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+.auth-tabs .seg-btn { min-width: 0; }
+.auth-link {
+  align-self: flex-start; min-height: 44px; padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); text-decoration: underline;
+}

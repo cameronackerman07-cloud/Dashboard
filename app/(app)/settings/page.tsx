@@ -1,10 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { AccountCard } from "@/components/AccountCard";
 import { CalendarConnect } from "@/components/CalendarConnect";
 import { CanvasConnect } from "@/components/CanvasConnect";
 import { Icon, type IconName } from "@/components/Icon";
 import { getCalendarConnections, IMPORT_SOURCE } from "@/lib/calendar";
 import { getCanvasStatus } from "@/lib/canvas";
+import { getProfile } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/server";
 import { formatShortDate } from "@/lib/time";
 
@@ -60,7 +62,8 @@ export default async function SettingsPage() {
   const keyStatus = (env: string) => (process.env[env] ? "Key set" : "Key not set");
 
   const supabase = await createClient();
-  const [calendars, canvas, imported] = await Promise.all([
+  const [profile, calendars, canvas, imported] = await Promise.all([
+    getProfile(),
     getCalendarConnections(),
     getCanvasStatus(),
     supabase.from("events").select("id", { count: "exact", head: true }).eq("source", IMPORT_SOURCE),
@@ -81,6 +84,8 @@ export default async function SettingsPage() {
           disconnect it any time.
         </p>
       </div>
+
+      {profile ? <AccountCard displayName={profile.displayName} email={profile.email} /> : null}
 
       <CalendarConnect
         connected={calendars

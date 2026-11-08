@@ -61,17 +61,25 @@ Read this before every task. Keep it up to date when decisions change.
   no login) for Google's OAuth consent screen. Keep them reachable while signed out.
 - `components/Icon.tsx` — inline stroke icons. Add new ones to `PATHS`.
 
-## Auth & data (Supabase, phase 1A)
-- Email magic-link login via `@supabase/ssr`. `proxy.ts` (Next 16 middleware) refreshes the session
-  and gates every route; only `/login`, `/auth/*`, `/privacy` and `/terms` are public.
-- Supabase clients: `lib/supabase/client.ts` (browser), `lib/supabase/server.ts` (server
-  components / route handlers), `lib/supabase/middleware.ts` (used by `proxy.ts`). Client code reads
-  `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (mapped in `next.config.mjs`).
-- Sign-in page: `app/login/page.tsx`. Magic-link lands on `app/auth/confirm/route.ts`; sign-out is
-  `app/auth/signout/route.ts`.
-- SQL schema + RLS: `supabase/migrations/`. `0001_init.sql` (profiles, connections, tasks, events,
-  flashcards); `0002_phase1_more.sql` (timetable, notes, study_blocks). Run each in the Supabase SQL
-  editor. See `SETUP.md` for the one-time dashboard steps.
+## Auth & data (Supabase)
+- Email + password accounts for Cameron and invited friends; every row is private to its owner (RLS).
+  `app/login/` has Sign in / Create account tabs and "Forgot your password?" (emails a one-time
+  link via `app/auth/confirm`, which only redirects to paths on this site; then set a password in Settings).
+- Sign-in, sign-up and the forgot-password email are route handlers in `app/api/auth/*`. Sign-up uses the
+  service-role client (`lib/supabase/admin.ts`) to `auth.admin.createUser({ email_confirm: true })`, so
+  no confirmation email. If `INVITE_CODE` is set, sign-up needs it (`lib/auth.ts`, compared in constant time).
+- `proxy.ts` (Next 16 middleware) refreshes the session and gates every route; public: `/login`,
+  `/auth/*`, `/api/auth/*`, `/api/cron/*` (checks `CRON_SECRET` itself), `/privacy`, `/terms`, manifest, icons.
+- Supabase clients: `lib/supabase/client.ts` (browser), `server.ts` (server components, route handlers,
+  actions; `currentUserId()`), `middleware.ts` (used by `proxy.ts`), `admin.ts` (service role: sign-up and
+  cron only). `lib/supabase/env.ts` → `supabaseConfigured()`: with no Supabase env vars the build still
+  passes and every page shows "Supabase isn't connected yet".
+- `profiles.display_name` (set at sign-up, editable in Settings → Your account) feeds the sidebar and
+  the Home greeting via `lib/profile.ts` (`getProfile`, cached per request).
+- ALL schema + RLS lives in one re-runnable file, `supabase/schema.sql` (paste into Supabase → SQL
+  Editor → Run, again after every change). Every table has `user_id default auth.uid()` and an
+  "all own" policy; links between a user's rows use composite foreign keys `(id, user_id)` so no one
+  can point at someone else's row.
 - `lib/crypto.ts` — AES-256-GCM encrypt/decrypt for saved tokens, server-only (`TOKEN_ENCRYPTION_KEY`).
 - `lib/ai.ts` — server-only AI router (`aiChat`, `aiConfigured`, `availableModels`). `MODELS` is the
   recommended list Auto tries; the picker also lists every other chat model each provider's `/models`

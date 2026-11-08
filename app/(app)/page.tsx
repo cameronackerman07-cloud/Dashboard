@@ -4,6 +4,7 @@ import { Greeting } from "@/components/Greeting";
 import { Icon } from "@/components/Icon";
 import { getCalendarConnections, loadEvents } from "@/lib/calendar";
 import { AUTO_SYNC_MS, syncCanvas } from "@/lib/canvas";
+import { getProfile } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/server";
 import { SAMPLE_HABITS } from "@/lib/sample";
 import type { DbTask } from "@/lib/tasks";
@@ -73,7 +74,7 @@ export default async function Home() {
   return (
     <main className="main">
       <div className="page-head">
-        <Greeting name="Cameron" />
+        <Greeting name={(await getProfile())?.displayName ?? "there"} />
         <button type="button" className="icon-btn desktop-only" aria-label="Notifications">
           <Icon name="bell" />
         </button>

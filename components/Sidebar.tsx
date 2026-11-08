@@ -14,9 +14,13 @@ function hrefFor(item: NavItem) {
 
 export function Sidebar({
   badges = {},
+  displayName,
+  initials,
   userEmail = "",
 }: {
   badges?: Record<string, number>;
+  displayName: string;
+  initials: string;
   userEmail?: string;
 }) {
   const pathname = usePathname();
@@ -177,12 +181,18 @@ export function Sidebar({
                 <span className="label">Settings &amp; connections</span>
               </Link>
               <div className="profile">
-                <span className="avatar">CA</span>
+                <span className="avatar" aria-hidden="true">
+                  {initials}
+                </span>
                 <div style={{ minWidth: 0 }}>
-                  <div className="profile-name">Cameron</div>
-                  <div className="profile-sub profile-email" title={userEmail || undefined}>
-                    {userEmail || "Year 11 · HSC course"}
+                  <div className="profile-name profile-email" title={displayName}>
+                    {displayName}
                   </div>
+                  {userEmail ? (
+                    <div className="profile-sub profile-email" title={userEmail}>
+                      {userEmail}
+                    </div>
+                  ) : null}
                 </div>
                 <form action="/auth/signout" method="post" style={{ marginLeft: "auto" }}>
                   <button type="submit" className="icon-btn" aria-label="Sign out" title="Sign out">
