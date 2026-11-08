@@ -7,6 +7,8 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.SUPABASE_URL ?? "",
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
+    // Push notifications: the public half only. VAPID_PRIVATE_KEY stays on the server.
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY ?? "",
   },
   // HSC practice sends handwritten working as an image, which can exceed the 1 MB
   // default. Vercel itself rejects anything over 4.5 MB, so stay under that.

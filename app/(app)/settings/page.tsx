@@ -21,7 +21,6 @@ const SCHOOL: Row[] = [
 ];
 
 const DEVICES: Row[] = [
-  { name: "iPhone notifications", desc: "Morning briefing and due-date reminders", action: "Set up", icon: "bell" },
   { name: "Siri & Shortcuts", desc: "“Hey Siri, what’s due?” and Reminders sync", action: "Get Shortcut", icon: "mic" },
   { name: "Apple Calendar", desc: "Subscribe to your dashboard calendar", action: "Copy link", icon: "phone" },
   { name: "Spotify", desc: "Now playing on the home screen", action: "Connect", icon: "music" },
@@ -83,9 +82,14 @@ export default async function SettingsPage() {
           Link your school apps, Google, iPhone and AI models. Each one only reads what it needs, and you can
           disconnect it any time.
         </p>
-        <Link href="/install" className="card-link">
-          Install the app on your iPhone, iPad or Mac →
-        </Link>
+        <div className="note-actions">
+          <Link href="/install" className="card-link">
+            Install the app →
+          </Link>
+          <Link href="/settings/notifications" className="card-link">
+            Notifications →
+          </Link>
+        </div>
       </div>
 
       {profile ? <AccountCard displayName={profile.displayName} email={profile.email} /> : null}
