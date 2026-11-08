@@ -170,7 +170,7 @@ export const NAV: NavGroup[] = [
         blurb: "Quick notes, synced everywhere",
         phase: 4,
         built: true,
-        plans: ["Quick notes on any device", "Search across notes and school work"],
+        plans: ["Quick notes on any device", "Search titles and text, filter by subject", "Pin the important ones to the top"],
       },
       {
         slug: "todo",
@@ -179,7 +179,12 @@ export const NAV: NavGroup[] = [
         icon: "todo",
         blurb: "Personal tasks",
         phase: 4,
-        plans: ["Personal to-do list", "Syncs with Apple Reminders through a Shortcut"],
+        built: true,
+        plans: [
+          "Quick-add personal to-dos with a due date, subject and priority",
+          "Grouped into Overdue, Today, Upcoming, No date and Done",
+          "Dated to-dos show in Home's Due soon",
+        ],
       },
       {
         slug: "shifts",
@@ -188,9 +193,11 @@ export const NAV: NavGroup[] = [
         icon: "shifts",
         blurb: "Work and sport schedule",
         phase: 4,
+        built: true,
         plans: [
-          "Your work shifts and sport in one place",
-          "Feeds into the study planner so it never clashes",
+          "Your work, refereeing and gig shifts by week",
+          "Hours and estimated pay per week, with clash warnings",
+          "Repeat a shift weekly",
         ],
       },
       {
@@ -200,9 +207,11 @@ export const NAV: NavGroup[] = [
         icon: "pay",
         blurb: "Earnings and spending",
         phase: 4,
+        built: true,
         plans: [
-          "Estimates pay from your shifts",
-          "Simple budget and savings goals",
+          "Income, spending and what's left each month",
+          "Spending by category against monthly limits",
+          "Savings goals, and estimated pay from your shifts",
         ],
       },
       {
@@ -212,7 +221,8 @@ export const NAV: NavGroup[] = [
         icon: "habits",
         blurb: "Streaks and goals",
         phase: 4,
-        plans: ["Track study, sleep and training streaks", "Weekly check-in"],
+        built: true,
+        plans: ["Tick off today's habits", "Current and best streaks", "The last 14 days at a glance"],
       },
     ],
   },

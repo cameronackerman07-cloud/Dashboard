@@ -6,9 +6,10 @@ import { getCalendarConnections, loadEvents } from "@/lib/calendar";
 import { AUTO_SYNC_MS, syncCanvas } from "@/lib/canvas";
 import { getProfile } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/server";
-import { SAMPLE_HABITS } from "@/lib/sample";
+import { formatCents } from "@/lib/money";
+import { shiftPayCents, type Job, type Shift } from "@/lib/shifts";
 import type { DbTask } from "@/lib/tasks";
-import { formatTime, startOfDay, weekday } from "@/lib/time";
+import { addDays, dayKey, formatDayKey, formatTime, mondayOf, startOfDay, sydneyInstant, weekday } from "@/lib/time";
 
 type TodayRow = { key: string; slot: string; name: string; sub: string | null; chip: "NOW" | "NEXT" | null };
 
@@ -17,24 +18,64 @@ export default async function Home() {
   await syncCanvas({ maxAgeMs: AUTO_SYNC_MS });
   const supabase = await createClient();
   const now = Date.now();
-  const [{ data }, { events }, connections, { data: manual }] = await Promise.all([
-    supabase
-      .from("tasks")
-      .select("id, title, course, source, due_at, done")
-      .eq("done", false)
-      .order("due_at", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: true })
-      .limit(5),
-    loadEvents(startOfDay(now), startOfDay(now, 1)),
-    getCalendarConnections(),
-    supabase
-      .from("timetable")
-      .select("id, period, subject, room")
-      .eq("day_of_week", weekday(now))
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true }),
-  ]);
-  const dueSoon: DbTask[] = data ?? [];
+  const todayKey = dayKey(now);
+  const monday = mondayOf(todayKey);
+  const [{ data }, { events }, connections, { data: manual }, { data: todos }, { data: nextShifts }, { data: habits }, { data: habitLogs }] =
+    await Promise.all([
+      supabase
+        .from("tasks")
+        .select("id, title, course, source, due_at, done")
+        .eq("done", false)
+        .order("due_at", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: true })
+        .limit(5),
+      loadEvents(startOfDay(now), startOfDay(now, 1)),
+      getCalendarConnections(),
+      supabase
+        .from("timetable")
+        .select("id, period, subject, room")
+        .eq("day_of_week", weekday(now))
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("todos")
+        .select("id, title, subject, due_on")
+        .eq("done", false)
+        .not("due_on", "is", null)
+        .order("due_on", { ascending: true })
+        .limit(5),
+      supabase
+        .from("shifts")
+        .select("id, job_id, starts_at, ends_at, unpaid_break_minutes, rate_override_cents, notes")
+        .gt("ends_at", new Date(now).toISOString())
+        .order("starts_at", { ascending: true })
+        .limit(1),
+      supabase.from("habits").select("id, name").eq("archived", false).order("created_at", { ascending: true }).limit(6),
+      supabase.from("habit_logs").select("habit_id, day").gte("day", monday).lte("day", addDays(monday, 6)),
+    ]);
+
+  // Due soon: school tasks and dated to-dos together, soonest first.
+  const todoItems: DbTask[] = ((todos ?? []) as { id: string; title: string; subject: string | null; due_on: string }[]).map((t) => ({
+    id: `todo-${t.id}`,
+    title: t.title,
+    course: t.subject,
+    source: "todo",
+    due_at: new Date(sydneyInstant(t.due_on, "23:59")).toISOString(),
+    done: false,
+  }));
+  const dueSoon: DbTask[] = [...((data ?? []) as DbTask[]), ...todoItems]
+    .sort((a, b) => (a.due_at ?? "9999").localeCompare(b.due_at ?? "9999"))
+    .slice(0, 6);
+
+  // Next shift (or the one on now), with its job for the name and pay.
+  const nextShift = ((nextShifts ?? []) as Shift[])[0] ?? null;
+  const { data: nextJob } = nextShift
+    ? await supabase.from("jobs").select("id, name, default_rate_cents, kind").eq("id", nextShift.job_id).maybeSingle()
+    : { data: null };
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  const logged = new Set(((habitLogs ?? []) as { habit_id: string; day: string }[]).map((l) => `${l.habit_id}|${l.day}`));
+
 
   // Today's classes: from the connected calendar if there is one, otherwise the
   // classes added by hand on the Timetable page.
@@ -81,7 +122,7 @@ export default async function Home() {
       </div>
 
       <div className="notice" role="note">
-        <span>Showing sample data. Connect Canvas, Google and your other apps to fill this in.</span>
+        <span>The briefing and countdowns are examples for now. Connect Canvas and your timetable to fill in the rest.</span>
         <Link href="/settings" className="card-link">
           Open connections →
         </Link>
@@ -209,28 +250,63 @@ export default async function Home() {
         <section className="card" aria-label="Habits">
           <div className="card-head">
             <h2 className="card-title">Habits this week</h2>
-            <span className="card-meta">M T W T F S S</span>
+            <span className="card-meta" aria-hidden="true">
+              M T W T F S S
+            </span>
           </div>
-          {SAMPLE_HABITS.map((h) => (
-            <div key={h.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minHeight: 32 }}>
-              <span style={{ fontSize: 14, fontWeight: 500 }}>{h.name}</span>
-              <span className="dots" aria-label={`${h.done} of 7 days done`}>
-                {Array.from({ length: 7 }, (_, i) => (
-                  <span key={i} className={`dot${i < h.done ? " on" : ""}`} />
-                ))}
-              </span>
-            </div>
-          ))}
+          {(habits ?? []).length === 0 ? (
+            <p className="track-empty" style={{ fontSize: 13 }}>
+              No habits yet. <Link href="/habits">Add one</Link> to track your streaks.
+            </p>
+          ) : (
+            ((habits ?? []) as { id: string; name: string }[]).map((h) => {
+              const count = weekDays.filter((d) => logged.has(`${h.id}|${d}`)).length;
+              return (
+                <div key={h.id} className="habit-home">
+                  <span className="habit-home-name">{h.name}</span>
+                  <span className="dots" role="img" aria-label={`${count} of 7 days done this week`}>
+                    {weekDays.map((d) => (
+                      <span key={d} className={`dot${logged.has(`${h.id}|${d}`) ? " on" : ""}`} />
+                    ))}
+                  </span>
+                </div>
+              );
+            })
+          )}
+          <Link href="/habits" className="card-link">
+            Open habits →
+          </Link>
         </section>
 
         <section className="card" aria-label="Next shift">
           <h2 className="card-title">Next shift</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 22, fontWeight: 700 }}>Not connected yet</span>
-            <span className="card-meta">Add your roster in Shifts to see your next shift and pay.</span>
-          </div>
+          {nextShift ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 22, fontWeight: 700 }}>
+                {new Date(nextShift.starts_at).getTime() <= now
+                  ? `On now until ${formatTime(new Date(nextShift.ends_at).getTime())}`
+                  : dayKey(new Date(nextShift.starts_at).getTime()) === todayKey
+                    ? `Today ${formatTime(new Date(nextShift.starts_at).getTime())}`
+                    : `${formatDayKey(dayKey(new Date(nextShift.starts_at).getTime()))} ${formatTime(new Date(nextShift.starts_at).getTime())}`}
+              </span>
+              <span className="card-meta">
+                {[
+                  nextJob?.name,
+                  `${formatTime(new Date(nextShift.starts_at).getTime())} – ${formatTime(new Date(nextShift.ends_at).getTime())}`,
+                  `about ${formatCents(shiftPayCents(nextShift, (nextJob ?? undefined) as Job | undefined))}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 22, fontWeight: 700 }}>No shifts coming up</span>
+              <span className="card-meta">Add your roster in Shifts to see your next shift and pay.</span>
+            </div>
+          )}
           <Link href="/shifts" className="card-link">
-            Set up shifts →
+            Open shifts →
           </Link>
         </section>
 

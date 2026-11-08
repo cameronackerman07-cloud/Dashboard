@@ -53,7 +53,12 @@ export function formatDue(
 }
 
 // "canvas" → "Canvas". Manual tasks have no label.
-const SOURCE_LABELS: Record<string, string> = { canvas: "Canvas", classroom: "Google Classroom", compass: "Compass" };
+const SOURCE_LABELS: Record<string, string> = {
+  canvas: "Canvas",
+  classroom: "Google Classroom",
+  compass: "Compass",
+  todo: "To-do",
+};
 
 export function sourceLabel(source: string | null): string | null {
   if (!source || source === "manual") return null;

@@ -13,7 +13,7 @@ export function DueSoon({ tasks }: { tasks: DbTask[] }) {
   if (tasks.length === 0) {
     return (
       <p className="track-empty" style={{ fontSize: 13 }}>
-        Nothing due right now. Add tasks on the Assignments page.
+        Nothing due. Add school tasks in Assignments, or dated to-dos in To-do.
       </p>
     );
   }
