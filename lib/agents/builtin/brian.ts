@@ -146,8 +146,17 @@ async function sundayReset(ctx: AgentContext, findings: StoredFinding[]): Promis
     ],
   });
 
-  const money = await ctx.read<{ incomeCents: number; spentCents: number }>("money_summary").catch(() => null);
-  if (money) sections.push({ heading: "Money this month", points: [`In ${formatCents(money.incomeCents)}, spent ${formatCents(money.spentCents)}, left ${formatCents(money.incomeCents - money.spentCents)}`] });
+  const money = await ctx.read<{ incomeCents: number; spentCents: number; nextWeekPlan?: { spendCents: number; savingsCents: number } | null }>("money_summary").catch(() => null);
+  if (money)
+    sections.push({
+      heading: "Money",
+      points: [
+        `This month: in ${formatCents(money.incomeCents)}, spent ${formatCents(money.spentCents)}, left ${formatCents(money.incomeCents - money.spentCents)}`,
+        money.nextWeekPlan
+          ? `Next week's budget: up to ${formatCents(money.nextWeekPlan.spendCents)} of spending, ${formatCents(money.nextWeekPlan.savingsCents)} to savings`
+          : "No budget plan for next week yet: on Monday open Pay & budget and tap Plan my week, or ask The BRIAN.",
+      ],
+    });
 
   const fs = findingsSection(ctx, findings, 6);
   if (fs) sections.push(fs);

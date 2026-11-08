@@ -72,6 +72,16 @@ function ProposalCard({ p, status, onStatus }: { p: Proposal; status: Status; on
         </ul>
       ) : null}
       {draft.plan?.note ? <p className="field-help">{draft.plan.note}</p> : null}
+      {draft.budget ? (
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          {draft.budget.allowance.map((x) => (
+            <li key={x.category} className="task-sub">
+              {x.category}: ${(x.cents / 100).toFixed(2)}
+            </li>
+          ))}
+          <li className="task-sub">Income estimate: {draft.budget.income.basis}</li>
+        </ul>
+      ) : null}
 
       {a.type === "create_flashcards" ? (
         <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -154,6 +164,11 @@ function ProposalCard({ p, status, onStatus }: { p: Proposal; status: Status; on
               {a.type === "create_study_plan" || a.type === "add_study_block" ? (
                 <Link href="/planner" className="btn btn-small">
                   Open Study planner
+                </Link>
+              ) : null}
+              {a.type === "create_budget_plan" ? (
+                <Link href="/pay" className="btn btn-small">
+                  Open Pay &amp; budget
                 </Link>
               ) : null}
               <button type="button" className="btn btn-small" onClick={() => undo(status.actionId!)} disabled={busy}>

@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { aiJson, AiError } from "@/lib/ai";
 import { sendPush } from "@/lib/push";
 import { htmlToText, fetchPage } from "@/lib/safe-fetch";
-import { addDays, dayKey, monthRange, monthKey, sydneyInstant } from "@/lib/time";
+import { addDays, dayKey, mondayOf, monthRange, monthKey, sydneyInstant } from "@/lib/time";
 import { sanitizeForAI } from "./sanitize";
 import type { AgentContext, AgentRow, NewReport, ReportKind, SourceId, StoredFinding } from "./types";
 
@@ -109,7 +109,15 @@ export async function readSource(db: Db, userId: string, source: SourceId, agent
           byCategory[t.category] = (byCategory[t.category] ?? 0) + t.amount_cents;
         }
       }
-      return { month: monthKey(now), incomeCents: income, spentCents: spent, spentByCategory: byCategory };
+      // Next week's budget plan, if one's been made (for the Sunday reset).
+      const nextMonday = addDays(mondayOf(dayKey(now)), 7);
+      const plans = await safe(
+        db.from("budget_plans").select("plan").eq("user_id", userId).eq("week_start", nextMonday).eq("status", "active").limit(1),
+        [] as { plan: { allowance?: { cents: number }[]; savingsCents?: number } }[],
+      );
+      const np = plans[0]?.plan;
+      const nextWeekPlan = np ? { spendCents: (np.allowance ?? []).reduce((a: number, x: { cents: number }) => a + (Number(x.cents) || 0), 0), savingsCents: Number(np.savingsCents) || 0 } : null;
+      return { month: monthKey(now), incomeCents: income, spentCents: spent, spentByCategory: byCategory, nextWeekPlan };
     }
     case "assessments":
       return safe(db.from("assessments").select("course, task, date, weighting, mark, max_mark").eq("user_id", userId).limit(300), []);

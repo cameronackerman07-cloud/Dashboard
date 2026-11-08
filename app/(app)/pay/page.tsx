@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/PageHeader";
 import type { BudgetLimit, SavingsGoal, Transaction } from "@/lib/budget";
 import { formatCents } from "@/lib/money";
 import { shiftPayCents, shiftPayNote, type Job, type Shift } from "@/lib/shifts";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, currentUserId } from "@/lib/supabase/server";
 import {
   addDays,
   addMonths,
@@ -17,9 +17,14 @@ import {
   monthRange,
   sydneyInstant,
 } from "@/lib/time";
+import { hasUsableKey } from "@/lib/ai-keys";
+import { activePlan } from "@/lib/budget-plan";
+import { BudgetPlanCard } from "./BudgetPlanCard";
 import { PayClient, type ShiftWeek } from "./PayClient";
 
 export const metadata: Metadata = { title: "Pay & budget" };
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type Props = { searchParams: Promise<{ m?: string }> };
 
@@ -42,7 +47,7 @@ export default async function PayPage({ searchParams }: Props) {
       .lt("occurred_on", end)
       .order("occurred_on", { ascending: false })
       .order("created_at", { ascending: false }),
-    supabase.from("budget_limits").select("id, category, monthly_limit_cents").order("category", { ascending: true }),
+    supabase.from("budget_limits").select("id, category, monthly_limit_cents").not("monthly_limit_cents", "is", null).order("category", { ascending: true }),
     supabase.from("savings_goals").select("id, name, target_cents, saved_cents").order("created_at", { ascending: true }),
     supabase.from("jobs").select("id, name, default_rate_cents, kind"),
     supabase
@@ -53,6 +58,17 @@ export default async function PayPage({ searchParams }: Props) {
   ]);
 
   const transactions = (tx ?? []) as Transaction[];
+
+  // This week's budget plan and what's been spent against it so far.
+  const thisWeek = mondayOf(today);
+  const userId = await currentUserId();
+  const [plan, aiReady, { data: weekTx }] = await Promise.all([
+    userId ? activePlan(supabase, userId, thisWeek).catch(() => null) : Promise.resolve(null),
+    userId ? hasUsableKey(userId).catch(() => false) : Promise.resolve(false),
+    supabase.from("transactions").select("amount_cents, category").eq("type", "expense").gte("occurred_on", thisWeek).lt("occurred_on", addDays(thisWeek, 7)),
+  ]);
+  const spentByCategory: Record<string, number> = {};
+  for (const t of (weekTx ?? []) as { amount_cents: number; category: string }[]) spentByCategory[t.category] = (spentByCategory[t.category] ?? 0) + t.amount_cents;
   const jobById = new Map(((jobs ?? []) as Job[]).map((j) => [j.id, j]));
   const shiftList = (shifts ?? []) as Shift[];
 
@@ -125,6 +141,8 @@ export default async function PayPage({ searchParams }: Props) {
           <span className="stat-value">{formatCents(income - spent)}</span>
         </div>
       </div>
+
+      <BudgetPlanCard thisWeek={thisWeek} plan={plan} spentByCategory={spentByCategory} aiReady={aiReady} />
 
       <PayClient
         transactions={transactions}

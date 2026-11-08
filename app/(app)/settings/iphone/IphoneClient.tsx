@@ -13,6 +13,7 @@ const RECIPES: Recipe[] = [
   { name: "What's due", phrase: "What's due", path: "due", method: "GET", finish: "Add Speak Text and choose the Contents of URL." },
   { name: "Today", phrase: "Today", path: "today", method: "GET", finish: "Add Speak Text (or Show Result) with the Contents of URL." },
   { name: "Next shift", phrase: "Next shift", path: "next-shift", method: "GET", finish: "Add Speak Text with the Contents of URL." },
+  { name: "My budget", phrase: "How's my budget", path: "budget", method: "GET", finish: "Add Speak Text with the Contents of URL." },
   { name: "Add to dashboard", phrase: "Add to dashboard", path: "add-todo", method: "POST", body: `{"title": "<Dictated Text>"}`, finish: "Before it, add Dictate Text. In the request body choose JSON, add a key title, and set it to Dictated Text. End with Speak Text.", write: true },
   { name: "Save to notes", phrase: "Save to notes", path: "add-note", method: "POST", body: `{"text": "<Shortcut Input>"}`, finish: "Turn on Show in Share Sheet (accepts URLs and Text). In the JSON body add a key text set to Shortcut Input. Now Share → Save to notes works from Safari.", write: true },
   { name: "Log habit", phrase: "Log habit", path: "log-habit", method: "POST", body: `{"habit": "<Ask for Input>"}`, finish: "Before it, add Ask for Input (\"Which habit?\"). Put the answer in a JSON key habit. End with Speak Text.", write: true },

@@ -6,6 +6,9 @@ import { hasUsableKey } from "@/lib/ai-keys";
 import { sanitizeForAI } from "@/lib/agents/sanitize";
 import { applyAddBlock, applyAddNote, applyAddTodo, applyCreateFlashcards, applyLogHabit, applyStudyPlan, undoAction } from "@/lib/assistant/apply";
 import { ACTION_GUIDE, parseAction, parseAssistantReply, TINY_ACTIONS, type AssistantAction, type AssistantMode } from "@/lib/assistant/schema";
+import { buildPlan, gatherFacts, savePlan } from "@/lib/budget-plan";
+import { isBudgetPlan, normalizePlan, planTotals, type BudgetPlan } from "@/lib/budget-plan-core";
+import { formatCents } from "@/lib/money";
 import { ALL_ITEMS, COURSES } from "@/lib/nav";
 import { draftPlan, type PlanDraft } from "@/lib/planner/generate";
 import { createClient, currentUserId } from "@/lib/supabase/server";
@@ -25,6 +28,7 @@ export type Proposal = {
   summary: string;
   tiny: boolean;
   plan?: PlanDraft;
+  budget?: BudgetPlan;
   agentId?: string;
   href?: string;
   unavailable?: string;
@@ -71,8 +75,20 @@ async function prepare(userId: string, action: AssistantAction, agents: { id: st
       return { key, action, tiny, summary: `Make ${action.cards.length} ${action.subject} flashcards${action.topic ? ` on ${action.topic}` : ""}.` };
     case "log_habit":
       return { key, action, tiny, summary: `Tick "${action.habit}" for today.` };
-    case "create_budget_plan":
-      return { key, action, tiny, summary: "Make this week's budget plan", unavailable: "Budget plans aren't ready yet. They're coming to Pay & budget soon." };
+    case "create_budget_plan": {
+      const supabase = await createClient();
+      const week = mondayOf(dayKey(Date.now()));
+      const facts = await gatherFacts(supabase, userId, week);
+      const budget = await buildPlan(userId, facts, action.note ? [{ q: "Anything to plan for this week?", a: action.note }] : []);
+      const t = planTotals(budget);
+      return {
+        key,
+        action,
+        tiny,
+        budget,
+        summary: `I'll save a budget plan for this week: about ${formatCents(budget.income.cents)} in, ${formatCents(t.spend)} flexible spending, ${formatCents(budget.savingsCents)} to savings.`,
+      };
+    }
     case "research_topic":
       return { key, action, tiny, summary: `Research "${action.topic}"`, unavailable: "Research isn't ready yet. It's coming with the Coach agent soon." };
     case "rename_agent":
@@ -115,6 +131,9 @@ export async function applyProposal(p: Proposal): Promise<Applied> {
     case "log_habit":
       res = await applyLogHabit(action);
       break;
+    case "create_budget_plan":
+      res = await applyBudgetPlan(p.budget);
+      break;
     case "rename_agent":
       if (!isUuid(p.agentId)) return { summary, ...SAVE_FAILED, actionId: null };
       res = await renameAgent(p.agentId, action.new_name);
@@ -126,6 +145,32 @@ export async function applyProposal(p: Proposal): Promise<Applied> {
   revalidatePath("/planner");
   revalidatePath("/");
   return { summary, ok: res.ok, message: res.message, actionId: res.actionId ?? null };
+}
+
+async function applyBudgetPlan(budget: unknown): Promise<{ ok: boolean; message: string; actionId?: string | null }> {
+  const userId = await currentUserId();
+  if (!userId || !isBudgetPlan(budget)) return { ok: false, message: "That plan is missing. Ask again." };
+  const supabase = await createClient();
+  const week = mondayOf(dayKey(Date.now()));
+  // Recompute from the facts rather than trusting numbers sent back from the browser.
+  const facts = await gatherFacts(supabase, userId, week);
+  const plan =
+    normalizePlan(
+      {
+        fixed: budget.fixed.map((f) => ({ label: f.label, amount: f.cents / 100 })),
+        allowance: budget.allowance.map((a) => ({ category: a.category, amount: a.cents / 100 })),
+        buffer: budget.bufferCents / 100,
+        savings: budget.savingsCents / 100,
+        tips: budget.tips,
+      },
+      facts,
+      budget.byAI,
+    ) ?? budget;
+  const id = await savePlan(supabase, userId, week, [], plan);
+  if (!id) return { ok: false, message: "Couldn't save the plan." };
+  const { data } = await supabase.from("assistant_actions").insert({ action: "create_budget_plan", summary: `Budget plan for the week of ${week}`, created_ids: { budget_plans: [id] } }).select("id").single();
+  revalidatePath("/pay");
+  return { ok: true, message: "Saved. See it on Pay & budget.", actionId: (data?.id as string) ?? null };
 }
 
 export async function undoAssistantAction(id: string): Promise<Reply> {

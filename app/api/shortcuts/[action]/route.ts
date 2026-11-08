@@ -4,7 +4,10 @@ import { hoursMessage, lastPayWeek, payWeekStart, type HoursShift } from "@/lib/
 import { rateLimited, verifyDeviceToken } from "@/lib/device-tokens";
 import { optionalSubject } from "@/lib/subjects";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { addDays, dayKey, formatDayKey, formatTime, sydneyInstant } from "@/lib/time";
+import { activePlan } from "@/lib/budget-plan";
+import { planTotals } from "@/lib/budget-plan-core";
+import { formatCents } from "@/lib/money";
+import { addDays, dayKey, formatDayKey, formatTime, mondayOf, sydneyInstant } from "@/lib/time";
 
 // JSON endpoints for iPhone Shortcuts and Siri. Auth: "Authorization: Bearer
 // dash_…" (a device token from Settings → iPhone & Siri). Add ?format=text for
@@ -14,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 type Ctx = { params: Promise<{ action: string }> };
-const READ = new Set(["due", "today", "next-shift", "cleaner-hours", "todos", "ping"]);
+const READ = new Set(["due", "today", "next-shift", "cleaner-hours", "todos", "budget", "ping"]);
 const WRITE = new Set(["add-todo", "add-note", "log-habit", "ask"]);
 
 function reply(request: Request, json: Record<string, unknown>, text: string, status = 200) {
@@ -65,6 +68,18 @@ async function handle(request: Request, { params }: Ctx) {
       const fresh = data && dayKey(new Date(data.created_at as string).getTime()) === today;
       const text = fresh ? (data!.headline as string) : "There's no briefing for today yet.";
       return reply(request, { ok: true, briefing: fresh ? data!.headline : null }, text);
+    }
+
+    case "budget": {
+      // This week's budget plan (made on Pay & budget or by asking The BRIAN).
+      const found = await activePlan(db, uid, mondayOf(today));
+      if (!found) return reply(request, { ok: true, plan: null }, "No budget plan for this week yet. Open Pay and budget and tap Plan my week.");
+      const p = found.plan;
+      const { data: spent } = await db.from("transactions").select("amount_cents").eq("user_id", uid).eq("type", "expense").gte("occurred_on", mondayOf(today)).lt("occurred_on", addDays(mondayOf(today), 7));
+      const used = ((spent ?? []) as { amount_cents: number }[]).reduce((a, t) => a + t.amount_cents, 0);
+      const t = planTotals(p);
+      const text = `This week you planned ${formatCents(t.spend)} of spending and you've spent ${formatCents(used)}. Put ${formatCents(p.savingsCents)} towards savings.`;
+      return reply(request, { ok: true, plan: { spend_cents: t.spend, spent_cents: used, savings_cents: p.savingsCents, income_cents: p.income.cents } }, text);
     }
 
     case "next-shift": {

@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { cleanCategory, SHIFT_PAY_CATEGORY } from "@/lib/budget";
+import { buildPlan, gatherFacts, nextQuestion, savePlan } from "@/lib/budget-plan";
+import { cleanAnswers, isBudgetPlan, type BudgetAnswer, type BudgetPlan, type BudgetQuestion } from "@/lib/budget-plan-core";
 import { formatCents, parseDollars } from "@/lib/money";
 import { shiftPayNote, totals, type Job, type Shift } from "@/lib/shifts";
 import { createClient, currentUserId } from "@/lib/supabase/server";
@@ -57,7 +59,9 @@ export async function setBudgetLimit(form: FormData): Promise<Reply> {
 
   const supabase = await createClient();
   if (limit === 0) {
-    const { error } = await supabase.from("budget_limits").delete().eq("category", category);
+    // Keep the row if it still holds a weekly limit.
+    await supabase.from("budget_limits").update({ monthly_limit_cents: null }).eq("category", category).not("weekly_limit_cents", "is", null);
+    const { error } = await supabase.from("budget_limits").delete().eq("category", category).is("weekly_limit_cents", null);
     if (error) return SAVE_FAILED;
     refresh();
     return { ok: true, message: `Removed the limit for ${category}.` };
@@ -147,4 +151,61 @@ export async function logShiftPay(mondayInput: string): Promise<Reply> {
   if (error) return SAVE_FAILED;
   refresh();
   return { ok: true, message: `Logged ${formatCents(cents)} of shift pay. It's an estimate before tax, so swap it for the real amount when you're paid.` };
+}
+
+// ---------- Plan my week ----------
+
+function planWeek(week: unknown): string | null {
+  return isDayKey(week) ? mondayOf(week) : null;
+}
+
+export async function budgetQuestion(week: string, answers: BudgetAnswer[]): Promise<Reply & { question?: BudgetQuestion | null }> {
+  const userId = await currentUserId();
+  if (!userId) return SIGNED_OUT;
+  const monday = planWeek(week);
+  if (!monday) return { ok: false, message: "That week doesn't look right." };
+  const supabase = await createClient();
+  try {
+    const facts = await gatherFacts(supabase, userId, monday);
+    const question = await nextQuestion(userId, facts, cleanAnswers(answers));
+    return { ok: true, message: "", question };
+  } catch {
+    // No question is fine: go straight to the plan.
+    return { ok: true, message: "", question: null };
+  }
+}
+
+export async function makeBudgetPlan(week: string, answers: BudgetAnswer[]): Promise<Reply & { plan?: BudgetPlan; id?: string | null }> {
+  const userId = await currentUserId();
+  if (!userId) return SIGNED_OUT;
+  const monday = planWeek(week);
+  if (!monday) return { ok: false, message: "That week doesn't look right." };
+  const supabase = await createClient();
+  const clean = cleanAnswers(answers);
+  try {
+    const facts = await gatherFacts(supabase, userId, monday);
+    const plan = await buildPlan(userId, facts, clean);
+    const id = await savePlan(supabase, userId, monday, clean, plan);
+    if (!id) return SAVE_FAILED;
+    refresh();
+    return { ok: true, message: "Here's your plan for the week.", plan, id };
+  } catch {
+    return { ok: false, message: "Couldn't make a plan right now. Try again in a minute." };
+  }
+}
+
+// Writes each allowance category as a weekly limit (after the student confirms).
+export async function applyWeeklyLimits(planId: string): Promise<Reply> {
+  if (!isUuid(planId)) return SAVE_FAILED;
+  const userId = await currentUserId();
+  if (!userId) return SIGNED_OUT;
+  const supabase = await createClient();
+  const { data } = await supabase.from("budget_plans").select("plan").eq("id", planId).maybeSingle();
+  if (!data || !isBudgetPlan(data.plan)) return { ok: false, message: "That plan couldn't be found." };
+  const rows = (data.plan as BudgetPlan).allowance.slice(0, 12).map((a) => ({ user_id: userId, category: cleanCategory(a.category), weekly_limit_cents: Math.max(0, Math.round(a.cents)) }));
+  if (!rows.length) return { ok: false, message: "That plan has no spending categories." };
+  const { error } = await supabase.from("budget_limits").upsert(rows, { onConflict: "user_id,category" });
+  if (error) return SAVE_FAILED;
+  refresh();
+  return { ok: true, message: `Set weekly limits for ${rows.map((r) => r.category).join(", ")}.` };
 }

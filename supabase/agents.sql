@@ -338,3 +338,30 @@ begin
   end loop;
 end
 $$;
+
+-- ===========================================================================
+-- Weekly budget plans (Pay & budget → Plan my week) and weekly limits.
+-- budget_limits keeps one row per category; a row can now hold a monthly
+-- limit, a weekly limit, or both.
+-- ===========================================================================
+create table if not exists public.budget_plans (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  week_start date not null,
+  answers    jsonb not null default '[]'::jsonb,
+  plan       jsonb not null default '{}'::jsonb,
+  status     text not null default 'active' check (status in ('draft', 'active', 'replaced')),
+  created_at timestamptz not null default now()
+);
+create index if not exists budget_plans_week_idx on public.budget_plans (user_id, week_start);
+
+alter table public.budget_limits alter column monthly_limit_cents drop not null;
+alter table public.budget_limits add column if not exists weekly_limit_cents integer check (weekly_limit_cents >= 0);
+
+do $$
+begin
+  execute 'alter table public.budget_plans enable row level security';
+  execute 'drop policy if exists "budget_plans: all own" on public.budget_plans';
+  execute 'create policy "budget_plans: all own" on public.budget_plans for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))';
+end
+$$;

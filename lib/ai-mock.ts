@@ -27,6 +27,14 @@ const MOCKS: Record<string, (user: string) => unknown> = {
       : /to-?do/i.test(user)
         ? { mode: "action", reply: "I'll add that (mock).", actions: [{ type: "add_todo", title: user.replace(/^.*to-?do:?\s*/i, "").slice(0, 80) || "Mock to-do", priority: 2 }] }
         : { mode: "chat", reply: `Mock answer (AI_MOCK=1). You asked: ${user.slice(0, 120)}`, actions: [] },
+  budget_question: () => ({ done: true }),
+  budget_plan: () => ({
+    fixed: [{ label: "Phone plan", amount: 15 }],
+    allowance: [{ category: "Food", amount: 40 }, { category: "Transport", amount: 20 }],
+    buffer: 10,
+    savings: 30,
+    tips: ["Mock tip: pack lunch twice this week."],
+  }),
   report: () => ({ headline: "Mock briefing: nothing urgent today.", sections: [{ heading: "Today", points: ["Mock point."] }] }),
 };
 
