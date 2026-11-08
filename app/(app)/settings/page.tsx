@@ -4,6 +4,8 @@ import { AccountCard } from "@/components/AccountCard";
 import { CalendarConnect } from "@/components/CalendarConnect";
 import { CanvasConnect } from "@/components/CanvasConnect";
 import { GoogleConnect } from "@/components/GoogleConnect";
+import { SpotifyConnect } from "@/components/SpotifyConnect";
+import { spotifyConfigured } from "@/lib/sources/spotify";
 import { listConnections } from "@/lib/oauth-store";
 import { googleConfigured } from "@/lib/sources/google";
 import { Icon, type IconName } from "@/components/Icon";
@@ -16,12 +18,6 @@ import { formatShortDate } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Settings & connections" };
 
-type Row = { name: string; desc: string; action: string; icon: IconName };
-
-const DEVICES: Row[] = [
-  { name: "Spotify", desc: "Now playing on the home screen", action: "Connect", icon: "music" },
-];
-
 const MODELS = [
   { name: "Google Gemini", desc: "Main model — reads handwriting and photos of your work", env: "GEMINI_API_KEY" },
   { name: "Groq", desc: "Very fast, with several open models", env: "GROQ_API_KEY" },
@@ -30,29 +26,7 @@ const MODELS = [
   { name: "Mistral", desc: "Extra backup", env: "MISTRAL_API_KEY" },
 ];
 
-function ConnectionList({ rows }: { rows: Row[] }) {
-  return (
-    <div className="list-card">
-      {rows.map((r) => (
-        <div className="list-row" key={r.name}>
-          <span className="list-icon">
-            <Icon name={r.icon} size={18} />
-          </span>
-          <div className="list-text">
-            <span className="list-name">{r.name}</span>
-            <span className="list-desc">{r.desc}</span>
-          </div>
-          <span className="list-desc">Not connected</span>
-          <button type="button" className="btn" disabled title="Coming in the next build step" style={{ minHeight: 40, fontSize: 13 }}>
-            {r.action}
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-type Props = { searchParams: Promise<{ google?: string }> };
+type Props = { searchParams: Promise<{ google?: string; spotify?: string }> };
 
 const GOOGLE_NOTICE: Record<string, string> = {
   connected: "Google connected.",
@@ -64,7 +38,7 @@ const GOOGLE_NOTICE: Record<string, string> = {
 };
 
 export default async function SettingsPage({ searchParams }: Props) {
-  const { google } = await searchParams;
+  const { google, spotify } = await searchParams;
   // Server-side check only: shows whether a key exists, never the key itself.
   const keyStatus = (env: string) => (process.env[env] ? "Key set" : "Key not set");
 
@@ -129,6 +103,12 @@ export default async function SettingsPage({ searchParams }: Props) {
         notice={google ? (GOOGLE_NOTICE[google] ?? null) : null}
       />
 
+      <SpotifyConnect
+        connected={profile ? (await listConnections(profile.id, "spotify")).length > 0 : false}
+        configured={spotifyConfigured()}
+        notice={spotify === "connected" ? "Spotify connected." : spotify === "failed" ? "Spotify didn't finish connecting. If you're a friend, ask Cameron to add your Spotify email to the app first." : null}
+      />
+
       <CanvasConnect
         state={
           canvas
@@ -141,11 +121,6 @@ export default async function SettingsPage({ searchParams }: Props) {
             : null
         }
       />
-
-      <section style={{ display: "flex", flexDirection: "column", gap: 10 }} aria-label="iPhone and apps">
-        <h2 className="section-label">iPhone &amp; apps</h2>
-        <ConnectionList rows={DEVICES} />
-      </section>
 
       {owner ? (
       <section style={{ display: "flex", flexDirection: "column", gap: 10 }} aria-label="AI models">

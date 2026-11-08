@@ -774,3 +774,6 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .token-box { display: block; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); font-size: 13px; overflow-wrap: anywhere; user-select: all; }
 .recipe { border-top: 1px solid var(--line-soft); padding-top: 4px; }
 .recipe code { overflow-wrap: anywhere; }
+.spotify-title { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spotify-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spotify-tile .icon-btn { width: 44px; height: 44px; border-radius: 22px; }

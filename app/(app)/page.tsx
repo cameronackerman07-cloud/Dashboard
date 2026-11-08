@@ -3,6 +3,7 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { DueSoon } from "@/components/DueSoon";
 import { Greeting } from "@/components/Greeting";
 import { Icon } from "@/components/Icon";
+import { SpotifyTile } from "@/components/SpotifyTile";
 import { getCalendarConnections, loadEvents } from "@/lib/calendar";
 import { AUTO_SYNC_MS, syncCanvas } from "@/lib/canvas";
 import { getProfile } from "@/lib/profile";
@@ -326,18 +327,7 @@ export default async function Home() {
           </div>
         </section>
 
-        <section className="card tile-row" aria-label="Spotify">
-          <span className="album">
-            <Icon name="music" size={22} />
-          </span>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>Nothing playing</span>
-            <span className="card-meta">Spotify · connect in Settings</span>
-          </div>
-          <button type="button" className="icon-btn" aria-label="Play" style={{ borderRadius: 22 }}>
-            <Icon name="play" size={18} />
-          </button>
-        </section>
+        <SpotifyTile />
       </div>
     </main>
   );
