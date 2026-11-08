@@ -175,6 +175,14 @@ export const TOPICS: Record<string, TopicGroup[]> = {
         t("The craft of writing", ["imaginative writing", "discursive writing", "reflection statement"]),
       ],
     },
+    {
+      year: "Year 11",
+      topics: [
+        t("Reading to write", ["close reading", "writing in response to texts", "language forms and features"]),
+        t("Contemporary possibilities", ["digital and multimodal texts", "how technology shapes texts"]),
+        t("Close study of literature", ["prescribed text", "analytical response", "context and values"]),
+      ],
+    },
   ],
 };
 
