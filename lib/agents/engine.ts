@@ -85,7 +85,9 @@ export async function runAgent(db: Db, agent: AgentRow, deadline: number, now = 
 
   let aiCalls = 0;
   try {
+    const { data: names } = await db.from("agents").select("id, name").eq("user_id", userId);
     const ctx = buildContext(db, agent, {
+      agentNames: new Map(((names ?? []) as { id: string; name: string }[]).map((a) => [a.id, a.name])),
       now,
       deadline,
       aiAvailable,

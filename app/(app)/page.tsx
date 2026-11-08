@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatCents } from "@/lib/money";
 import { shiftPayCents, type Job, type Shift } from "@/lib/shifts";
 import type { DbTask } from "@/lib/tasks";
-import { addDays, dayKey, formatDayKey, formatTime, mondayOf, startOfDay, sydneyInstant, weekday } from "@/lib/time";
+import { addDays, dayKey, formatDay, formatDayKey, formatTime, mondayOf, startOfDay, sydneyInstant, weekday } from "@/lib/time";
 
 type TodayRow = { key: string; slot: string; name: string; sub: string | null; chip: "NOW" | "NEXT" | null };
 
@@ -70,6 +70,13 @@ export default async function Home() {
 
   // Next shift (or the one on now), with its job for the name and pay.
   const nextShift = ((nextShifts ?? []) as Shift[])[0] ?? null;
+  const { data: latestBriefing } = await supabase
+    .from("reports")
+    .select("headline, created_at")
+    .eq("kind", "briefing")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   const { data: nextJob } = nextShift
     ? await supabase.from("jobs").select("id, name, default_rate_cents, kind").eq("id", nextShift.job_id).maybeSingle()
     : { data: null };
@@ -124,7 +131,7 @@ export default async function Home() {
       </div>
 
       <div className="notice" role="note">
-        <span>The briefing and countdowns are examples for now. Connect Canvas and your timetable to fill in the rest.</span>
+        <span>The countdowns are examples for now. Connect Canvas and your timetable to fill in the rest.</span>
         <Link href="/settings" className="card-link">
           Open connections →
         </Link>
@@ -142,21 +149,20 @@ export default async function Home() {
         </button>
       </form>
 
-      <section className="card briefing" aria-label="Morning briefing">
+      <section className="card briefing" aria-label="Your briefing">
         <div className="briefing-body">
           <div className="briefing-label">
             <Icon name="sparkle" size={16} />
             Your briefing
           </div>
           <p className="briefing-text">
-            Physics is your next class. Your Maths Advanced practice set is due Thursday, and you have a shift
-            tonight — so the planner has moved 30 minutes of Extension 1 flashcards to before dinner.
+            {latestBriefing?.headline || "No briefing yet. The BRIAN writes one each morning at 7 once your agents are running."}
           </p>
-          <span className="card-meta">Example — the AI agent writes this each morning and sends it to your iPhone.</span>
+          {latestBriefing ? <span className="card-meta">{formatDay(new Date(latestBriefing.created_at).getTime())}</span> : null}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          <Link href="/planner" className="btn">
-            See study plan
+          <Link href="/inbox" className="btn">
+            Open Inbox
           </Link>
         </div>
       </section>

@@ -17,6 +17,10 @@ const nextConfig = {
       bodySizeLimit: "4mb",
     },
   },
+  // The old /agents address now lives at /ai-agents.
+  async redirects() {
+    return [{ source: "/agents", destination: "/ai-agents", permanent: true }];
+  },
   // Pin the project root so Turbopack doesn't walk up into the home directory
   // (there's no lockfile boundary above this folder).
   turbopack: {

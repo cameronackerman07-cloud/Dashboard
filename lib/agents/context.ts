@@ -1,10 +1,11 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aiJson, AiError } from "@/lib/ai";
+import { sendPush } from "@/lib/push";
 import { htmlToText, fetchPage } from "@/lib/safe-fetch";
 import { addDays, dayKey, monthRange, monthKey, sydneyInstant } from "@/lib/time";
 import { sanitizeForAI } from "./sanitize";
-import type { AgentContext, AgentRow, SourceId } from "./types";
+import type { AgentContext, AgentRow, NewReport, ReportKind, SourceId, StoredFinding } from "./types";
 
 // Builds what an agent can see. Every query uses the service-role client, so
 // every one is filtered by user_id explicitly. Agents never get keys, tokens or
@@ -145,8 +146,17 @@ export async function aiCallsToday(db: Db, userId: string, agentId: string, now:
 export function buildContext(
   db: Db,
   agent: AgentRow,
-  opts: { now: number; deadline: number; aiAvailable: boolean; userNames: string[]; aiCallsSoFar: number; onAiCall: () => void },
+  opts: {
+    now: number;
+    deadline: number;
+    aiAvailable: boolean;
+    userNames: string[];
+    aiCallsSoFar: number;
+    onAiCall: () => void;
+    agentNames: Map<string, string>;
+  },
 ): AgentContext {
+  const userId = agent.user_id;
   const cache = new Map<SourceId, Promise<unknown>>();
   let calls = opts.aiCallsSoFar;
   let newHash: string | null = null;
@@ -165,6 +175,47 @@ export function buildContext(
       if (!agent.sources.includes(source)) throw new Error(`This agent isn't allowed to read ${source}.`);
       if (!cache.has(source)) cache.set(source, readSource(db, agent.user_id, source, agent, opts.now));
       return (await cache.get(source)) as T;
+    },
+    chief: {
+      unconsumed: async () =>
+        safe(
+          db
+            .from("agent_findings")
+            .select("id, agent_id, category, title, body, importance, action_url, created_at")
+            .eq("user_id", userId)
+            .is("consumed_at", null)
+            .order("importance", { ascending: false })
+            .order("created_at", { ascending: false })
+            .limit(100),
+          [] as StoredFinding[],
+        ),
+      markConsumed: async (ids) => {
+        for (let i = 0; i < ids.length; i += 100) {
+          await db.from("agent_findings").update({ consumed_at: iso(Date.now()) }).eq("user_id", userId).in("id", ids.slice(i, i + 100));
+        }
+      },
+      reports: async (kind: ReportKind, sinceIso: string) =>
+        safe(db.from("reports").select("id, created_at").eq("user_id", userId).eq("kind", kind).gte("created_at", sinceIso).limit(20), [] as { id: string; created_at: string }[]),
+      writeReport: async (r: NewReport) => {
+        const { data } = await db
+          .from("reports")
+          .insert({ user_id: userId, kind: r.kind, title: r.title.slice(0, 120), headline: r.headline.slice(0, 600), sections: r.sections.slice(0, 12), finding_ids: r.findingIds ?? [] })
+          .select("id")
+          .single();
+        return (data?.id as string) ?? null;
+      },
+      push: async (msg) => {
+        try {
+          await sendPush(userId, msg);
+        } catch {
+          console.error("Agent push failed");
+        }
+      },
+      agentName: (id) => opts.agentNames.get(id) ?? "An agent",
+      settings: async () => {
+        const row = await safe(db.from("user_settings").select("lat, lng, region").eq("user_id", userId).maybeSingle(), null as { lat: number | null; lng: number | null; region: string | null } | null);
+        return { lat: row?.lat ?? null, lng: row?.lng ?? null, region: row?.region ?? null };
+      },
     },
     ai: async ({ messages, system, json, purpose }) => {
       if (!opts.aiAvailable) throw new AiError("Add a free AI key in Settings to use this agent.");

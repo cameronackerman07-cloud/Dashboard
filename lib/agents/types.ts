@@ -73,6 +73,30 @@ export type AgentContext = {
   // A short text-only fingerprint of anything: lets an agent skip the AI when nothing changed.
   lastHash: string | null;
   setHash: (hash: string) => void;
+  // Only for the chief (The BRIAN): read other agents' findings, write reports, notify.
+  chief: {
+    unconsumed: () => Promise<StoredFinding[]>;
+    markConsumed: (ids: string[]) => Promise<void>;
+    reports: (kind: ReportKind, sinceIso: string) => Promise<{ id: string; created_at: string }[]>;
+    writeReport: (r: NewReport) => Promise<string | null>;
+    push: (msg: { title: string; body: string; url: string; category: "briefing" | "alerts" | "cleaning" | "money" | "school"; importance?: number }) => Promise<void>;
+    agentName: (agentId: string) => string;
+    settings: () => Promise<{ lat: number | null; lng: number | null; region: string | null }>;
+  };
+};
+
+export type ReportKind = "briefing" | "sunday_reset" | "alert" | "strategy" | "cleaning_hours" | "custom";
+export type ReportSection = { heading: string; points: string[] };
+export type NewReport = { kind: ReportKind; title: string; headline: string; sections: ReportSection[]; findingIds?: string[] };
+export type StoredFinding = {
+  id: string;
+  agent_id: string;
+  category: string;
+  title: string;
+  body: string;
+  importance: number;
+  action_url: string | null;
+  created_at: string;
 };
 
 export type AgentDefinition = {

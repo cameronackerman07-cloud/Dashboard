@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import { AppBadge } from "@/components/AutoRefresh";
 import { Sidebar } from "@/components/Sidebar";
+import { ensureDefaultAgents } from "@/lib/agents/defaults";
 import { initials } from "@/lib/auth";
 import { getProfile } from "@/lib/profile";
 import { supabaseConfigured } from "@/lib/supabase/env";
@@ -16,17 +18,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // Badge the Assignments nav item with the number of tasks still to do.
   const supabase = await createClient();
-  const { count } = await supabase.from("tasks").select("id", { count: "exact", head: true }).eq("done", false);
+  const [{ count }, { count: unread }] = await Promise.all([
+    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("done", false),
+    supabase.from("reports").select("id", { count: "exact", head: true }).is("read_at", null),
+    ensureDefaultAgents(profile.id).catch(() => undefined),
+  ]);
 
   return (
     <div className="shell">
       <Sidebar
-        badges={{ assignments: count ?? 0 }}
+        badges={{ assignments: count ?? 0, inbox: unread ?? 0 }}
         displayName={profile.displayName}
         initials={initials(profile.displayName)}
         userEmail={profile.email}
       />
       {children}
+      <AppBadge count={unread ?? 0} />
     </div>
   );
 }
