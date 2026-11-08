@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { NAV, type NavItem } from "@/lib/nav";
+import { isInstalled } from "@/app/install/InstallSteps";
 
 const STORAGE_KEY = "sidebar-collapsed";
 
@@ -26,14 +27,19 @@ export function Sidebar({
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [installed, setInstalled] = useState(true);
 
   // Remember the collapsed choice on this device (purely a convenience).
   useEffect(() => {
+    let saved: string | null = null;
     try {
-      setCollapsed(window.localStorage.getItem(STORAGE_KEY) === "1");
+      saved = window.localStorage.getItem(STORAGE_KEY);
     } catch {
-      /* storage unavailable — default to expanded */
+      /* storage unavailable */
     }
+    // No saved choice: tablets (761–1100px wide) start with the slim rail.
+    setCollapsed(saved === null ? window.matchMedia("(min-width: 761px) and (max-width: 1100px)").matches : saved === "1");
+    setInstalled(isInstalled());
   }, []);
 
   // Close the phone drawer whenever the page changes.
@@ -176,6 +182,12 @@ export function Sidebar({
             ))}
 
             <div className="sidebar-foot">
+              {installed ? null : (
+                <Link href="/install" className="nav-link">
+                  <Icon name="phone" />
+                  <span className="label">Install the app</span>
+                </Link>
+              )}
               <Link href="/settings" className="nav-link" aria-current={settingsActive ? "page" : undefined}>
                 <Icon name="settings" />
                 <span className="label">Settings &amp; connections</span>

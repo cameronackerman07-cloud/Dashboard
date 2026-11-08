@@ -83,6 +83,9 @@ export default async function SettingsPage() {
           Link your school apps, Google, iPhone and AI models. Each one only reads what it needs, and you can
           disconnect it any time.
         </p>
+        <Link href="/install" className="card-link">
+          Install the app on your iPhone, iPad or Mac →
+        </Link>
       </div>
 
       {profile ? <AccountCard displayName={profile.displayName} email={profile.email} /> : null}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { DueSoon } from "@/components/DueSoon";
 import { Greeting } from "@/components/Greeting";
 import { Icon } from "@/components/Icon";
@@ -115,6 +116,7 @@ export default async function Home() {
   return (
     <main className="main">
       <div className="page-head">
+        <AutoRefresh />
         <Greeting name={(await getProfile())?.displayName ?? "there"} />
         <button type="button" className="icon-btn desktop-only" aria-label="Notifications">
           <Icon name="bell" />
