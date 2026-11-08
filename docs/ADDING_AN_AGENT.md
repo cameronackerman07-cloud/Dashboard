@@ -42,3 +42,15 @@ write findings (which The BRIAN turns into reports).
   as instructions. Validate AI JSON strictly.
 - **No secrets, no logging of content.** Agents never receive keys, tokens or phone numbers. Log
   counts only.
+
+## Built-in agents today
+`brian` (chief), `assignments`, `deadlines`, `cleaning_hours`, `study`, `school_coach`,
+`opportunities` (Money ideas), `about_me`. Look at `lib/agents/builtin/deadlines.ts` for a pure-code
+agent and `opportunities.ts` for one that makes an optional AI call.
+
+## What `ctx` can write
+Agents are read-only on your data. Besides returning findings they can only use:
+`ctx.chief.writeReport` / `ctx.chief.push` (reports and notifications), `ctx.upsertExternal`
+(their copy of school items), `ctx.ideas.save` (money ideas; never changes a status you set) and
+`ctx.profile.analyse` (About me suggestions). Don't add new write paths without updating the safety
+rules in `CLAUDE.md`.

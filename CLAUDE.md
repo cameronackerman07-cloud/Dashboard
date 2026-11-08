@@ -28,14 +28,14 @@ Read this before every task. Keep it up to date when decisions change.
 - Signed-in pages live in the `app/(app)/` route group (shares `app/(app)/layout.tsx`, which
   renders the sidebar and redirects signed-out users to `/login`). The `(app)` folder name is a
   route group — it does not appear in the URL, so `app/(app)/page.tsx` is still `/`.
-- `app/(app)/page.tsx` — Home. Today, Due soon (tasks + dated to-dos), Habits this week and Next
-  shift are live; the briefing, countdowns, weather and Spotify tiles are still examples.
+- `app/(app)/page.tsx` — Home. Today, Due soon (tasks + dated to-dos), Habits this week, Next
+  shift, The BRIAN's latest briefing, the Ask bar and Spotify are live; countdowns and weather are still examples.
 - `app/(app)/[section]/page.tsx` — placeholder page for every sidebar item that isn't built yet.
   When you build a real page, create `app/(app)/<slug>/page.tsx` AND set `built: true` on that item
   in `lib/nav.ts` (the placeholder skips built slugs in `generateStaticParams`, so they don't clash).
 - Built pages so far: `assignments` (due-date tracker), `timetable`, `notes` (+ `notes/[id]` editor),
   `planner`, `hsc-practice`, `tutor`, `summaries`, `flashcards`, `calendar`, `todo`, `shifts`, `pay`,
-  `habits`. Each has `page.tsx` (server, fetches data), usually a `*Client.tsx` (interactivity,
+  `habits`, `inbox`, `ai-agents`, `assistant`, `coach`, `money-ideas`, `profile` (About me). Each has `page.tsx` (server, fetches data), usually a `*Client.tsx` (interactivity,
   optimistic updates) and `actions.ts` (server actions, RLS-scoped, return `Reply` from
   `lib/validate.ts`; `components/useAction.tsx` runs them and shows the reply).
 - Personal pages: all times are Australia/Sydney — store `timestamptz`, parse and show with the
@@ -141,6 +141,27 @@ Read this before every task. Keep it up to date when decisions change.
   `Authorization: Bearer $CRON_SECRET`, service-role client, one user at a time, logs counts only)
   and from the "Check for duplicates now" button.
 
+## Agents (docs/TASK-agents.md has the full spec)
+- Per-user AI keys: each person adds their own free keys (Settings → AI keys, `user_api_keys`, encrypted,
+  no RLS policies). Site env keys only serve `OWNER_EMAIL` (or friends if `SHARED_AI_FOR_FRIENDS`). `AI_MOCK=1` fakes AI locally.
+- Tables for agents, push, Google/Spotify, Siri tokens, planner, budget plans, coach, money ideas and About me are
+  in `supabase/agents.sql` (run after schema.sql; re-runnable). Compass was removed everywhere.
+- Framework: `lib/agents/` (types, schedule in Sydney time, context, engine, registry, custom agents).
+  `/api/agents/tick` (Bearer `AGENT_SECRET`, service-role, every query scoped by user_id, specialists before
+  The BRIAN, ~45 s budget) is called every 30 min by GitHub Actions (`docs/github/agents-tick.yml`).
+- Built-ins (`lib/agents/builtin/`): `brian` (chief: briefing 07:00, Sunday reset 18:30, urgent alerts),
+  `assignments` (hourly, `lib/agents/watch.ts`), `deadlines` (2-hourly, `lib/deadlines.ts`), `cleaning_hours`
+  (Wed 07:00, `lib/cleaning.ts`, jobs.weekly_hours_report), `study` (16:00), `school_coach` (Mon 16:30, `lib/coach.ts`),
+  `opportunities` (Money ideas, daily 09:00 + Saturday strategy, `lib/money-ideas.ts`), `about_me` (Sun 17:00,
+  `lib/about-me.ts` + `lib/about-me-server.ts`). Prefer plain code; AI only for wording/ideas, with template fallbacks.
+- Safety: scheduled agents are read-only on user data; they only write findings, reports, external_items,
+  money_ideas, About me suggestions and run logs. Never email, message, apply, buy or edit calendars. Fetched
+  content is untrusted data in `<data>` blocks; AI JSON is validated strictly; every AI input goes through
+  `sanitizeForAI`; logs hold counts only. Only the assistant (`/assistant`) changes data, after the user asks and confirms.
+- About me: only confirmed facts reach agents (`getProfileContext` → style guide, no names/contacts). Sensitive
+  topics are filtered out (`isSensitive`). Learning sources are opt-in switches, default off.
+- Real SMS (`lib/sms.ts`) is a stub that stays off; the iPhone Shortcut automation is the free texting route.
+
 ## Secrets — non-negotiable
 - API keys and tokens live ONLY in Vercel → Settings → Environment Variables (and `.env.local` for
   local dev, which is git-ignored). Names are listed in `.env.example`.
@@ -179,8 +200,7 @@ Physics · VET Entertainment · English Standard  (see `COURSES` in `lib/nav.ts`
   numbers and never sends the filename; the duplicate check sends card fronts only). The upload
   page tells students not to upload anything with personal details.
 - Tutor: hints first; full worked solution only when the user asks.
-- Agents (scheduled): morning briefing (7am Sydney, push to iPhone), new-assignment catcher
-  (hourly), upload summariser (on upload).
+- Agents (scheduled): see the Agents section above.
 
 ## HSC practice
 - Link each course/topic to NESA's official past papers and marking guidelines (link, don't copy the
@@ -192,7 +212,7 @@ Physics · VET Entertainment · English Standard  (see `COURSES` in `lib/nav.ts`
 ## Build phases
 1. Home, timetable, calendar, combined due-date tracker (incl. Canvas) — done
 2. HSC practice + marking, flashcards (spaced repetition), study planner — done
-3. AI agents, tutor chat, summaries — tutor and summaries done; scheduled agents next
+3. AI agents, tutor chat, summaries — done (agents spec: docs/TASK-agents.md, progress: docs/PROGRESS.md)
 4. Personal: notes, to-do, shifts, pay & budget, habits — done
 
 ## Working style
