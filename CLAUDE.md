@@ -28,14 +28,24 @@ Read this before every task. Keep it up to date when decisions change.
 - Signed-in pages live in the `app/(app)/` route group (shares `app/(app)/layout.tsx`, which
   renders the sidebar and redirects signed-out users to `/login`). The `(app)` folder name is a
   route group — it does not appear in the URL, so `app/(app)/page.tsx` is still `/`.
-- `app/(app)/page.tsx` — Home. `lib/sample.ts` holds sample data; replace each block with live data
-  and delete the sample when done.
+- `app/(app)/page.tsx` — Home. Today, Due soon (tasks + dated to-dos), Habits this week and Next
+  shift are live; the briefing, countdowns, weather and Spotify tiles are still examples.
 - `app/(app)/[section]/page.tsx` — placeholder page for every sidebar item that isn't built yet.
   When you build a real page, create `app/(app)/<slug>/page.tsx` AND set `built: true` on that item
   in `lib/nav.ts` (the placeholder skips built slugs in `generateStaticParams`, so they don't clash).
-- Built pages so far: `assignments` (due-date tracker), `timetable`, `notes`, `planner`,
-  `hsc-practice`, `tutor`, `summaries`, `flashcards`, `calendar`. Each has `page.tsx` (server, fetches data), usually a
-  `*Client.tsx` (interactivity, optimistic updates) and `actions.ts` (server actions, RLS-scoped).
+- Built pages so far: `assignments` (due-date tracker), `timetable`, `notes` (+ `notes/[id]` editor),
+  `planner`, `hsc-practice`, `tutor`, `summaries`, `flashcards`, `calendar`, `todo`, `shifts`, `pay`,
+  `habits`. Each has `page.tsx` (server, fetches data), usually a `*Client.tsx` (interactivity,
+  optimistic updates) and `actions.ts` (server actions, RLS-scoped, return `Reply` from
+  `lib/validate.ts`; `components/useAction.tsx` runs them and shows the reply).
+- Personal pages: all times are Australia/Sydney — store `timestamptz`, parse and show with the
+  helpers in `lib/time.ts` (`dayKey`, `sydneyInstant`, `mondayOf`, `monthRange`…), never the server's
+  timezone. Money is integer cents (`lib/money.ts`). Shift maths (paid minutes, pay, clashes) is
+  `lib/shifts.ts`; budget categories `lib/budget.ts`; streaks `lib/habits.ts`.
+- Subjects: `lib/subjects.ts` — `SUBJECT_GROUPS` (every NSW Stage 6 subject from NESA's 2026 HSC
+  course list, "My courses" first), `SYLLABUS` suggested modules (the seven courses come from
+  `lib/hsc.ts` TOPICS), `cleanSubject`/`optionalSubject`. `components/SubjectSelect.tsx` is the picker
+  used on Summaries, Flashcards, To-do and Notes. Modules and topics stay free text.
 - `components/PageHeader.tsx` — shared breadcrumb + icon + title + lede for built pages.
 - `components/DueSoon.tsx` — Home's live "Due soon" card. `lib/tasks.ts` — shared task shape +
   `formatDue` (pass `now` only after mount to avoid hydration mismatches).
@@ -101,7 +111,26 @@ Read this before every task. Keep it up to date when decisions change.
   stays on the 2017 syllabus until the 2028 HSC), the multiple-choice shape, and per-course past-paper links. Past papers are linked, never copied or scraped (NESA's and schools'
   copyright); "My own question" lets the student paste one in to be marked.
 - `lib/marking.ts` splits the marker's reply into sections and flashcards. `markAnswer` saves the
-  flashcards automatically; `lib/flashcards.ts` schedules reviews, shown on `app/(app)/flashcards`.
+  flashcards automatically (subject = course, module = practice topic, topic "Practice mistakes").
+- `aiJson(messages, parse, opts)` in `lib/ai.ts` asks for a JSON object, strips code fences, validates
+  with `parse` and retries once on the same model. `GEMINI_MODEL` / `GROQ_MODEL` / `OPENROUTER_MODEL` /
+  `MISTRAL_MODEL` env vars put a model first for that provider; `budgetMs` sets the total time.
+- Summaries: upload PDF/DOCX/TXT/MD (4 MB max; photos not yet) → `lib/extract.ts` (unpdf, mammoth) →
+  `lib/summarise.ts` (redacts emails/phones, caps at 30k chars, ~11k-char chunks in parallel, JSON
+  title/subject/sections/flashcards) → `uploads` row (extracted text only, never the file) + new
+  `flashcards` with `upload_id`, skipping any question whose `norm_key` the user already has.
+  Deleting an upload keeps its cards unless "also delete its flashcards" is ticked.
+- Flashcards (`flashcards` table: subject not null, module, topic, norm_key, reps, lapses, ease,
+  interval_days, due_at, upload_id, deduped_at, duplicate_of): browse Subject → Module → Topic
+  ("General" when empty), study due / any group / all / random 20, edit and move cards, keyboard
+  1–4 and Space. `lib/flashcards.ts`: SM-2 `nextReview`, `normKey`.
+- Duplicate check: `lib/dedupe.ts` `dedupeUser` — exact `norm_key` matches in code, then the AI groups
+  same-meaning questions (fronts only, 150 per batch at most); keeps the most-reviewed/oldest card,
+  sets `duplicate_of` on the others (soft archive, restorable), stamps `deduped_at`. Only unchecked
+  cards can be hidden and subjects with nothing new are skipped. Runs daily from
+  `app/api/cron/dedupe-flashcards/route.ts` (Vercel Cron in `vercel.json`, 19:00 UTC, needs
+  `Authorization: Bearer $CRON_SECRET`, service-role client, one user at a time, logs counts only)
+  and from the "Check for duplicates now" button.
 
 ## Secrets — non-negotiable
 - API keys and tokens live ONLY in Vercel → Settings → Environment Variables (and `.env.local` for
@@ -137,7 +166,9 @@ Physics · VET Entertainment · English Standard  (see `COURSES` in `lib/nav.ts`
   on any failure move to the next, and show the student the real reason if all fail. All four are
   OpenAI-compatible chat endpoints. Keep model IDs in `MODELS` (they change often).
 - Free tiers may use prompts for training: never send names, emails, tokens or other personal
-  details to a model. Send only the school content needed.
+  details to a model. Send only the school content needed (Summaries redacts emails and phone
+  numbers and never sends the filename; the duplicate check sends card fronts only). The upload
+  page tells students not to upload anything with personal details.
 - Tutor: hints first; full worked solution only when the user asks.
 - Agents (scheduled): morning briefing (7am Sydney, push to iPhone), new-assignment catcher
   (hourly), upload summariser (on upload).
@@ -150,10 +181,10 @@ Physics · VET Entertainment · English Standard  (see `COURSES` in `lib/nav.ts`
 - Exam mode with real HSC time limits.
 
 ## Build phases
-1. Home, timetable, calendar, combined due-date tracker (incl. Canvas) — **current**
-2. HSC practice + marking, flashcards (spaced repetition), study planner
-3. AI agents, tutor chat, summaries
-4. Personal: notes, to-do, shifts, pay & budget, habits
+1. Home, timetable, calendar, combined due-date tracker (incl. Canvas) — done
+2. HSC practice + marking, flashcards (spaced repetition), study planner — done
+3. AI agents, tutor chat, summaries — tutor and summaries done; scheduled agents next
+4. Personal: notes, to-do, shifts, pay & budget, habits — done
 
 ## Working style
 - Small, reviewable commits. Run `npm run build` before committing; it must pass.

@@ -1,4 +1,4 @@
-# Setup — Phase 1A (Supabase login + database)
+# Setup — Supabase, accounts and keys
 
 Do these once. They're all in web dashboards — no coding. Follow them top to bottom.
 
@@ -9,43 +9,33 @@ Do these once. They're all in web dashboards — no coding. Follow them top to b
    and choose region **Sydney (ap-southeast-2)**.
 4. Wait for it to finish setting up (a minute or two).
 
-## 2. Create the database tables
+## 2. Create (or update) the database tables
 1. In your project, open **SQL Editor** (left sidebar) → **New query**.
-2. Open the file [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql) in this repo,
-   copy **everything**, and paste it into the editor.
+2. Open [`supabase/schema.sql`](supabase/schema.sql) in this repo, copy **everything**, and paste it in.
 3. Click **Run** (bottom right). You should see "Success. No rows returned".
-4. Open a **New query** again and do the same with
-   [`supabase/migrations/0002_phase1_more.sql`](supabase/migrations/0002_phase1_more.sql), then **Run**.
-5. Check **Table Editor** — you should now see `profiles`, `connections`, `tasks`,
-   `events`, `flashcards`, `timetable`, `notes` and `study_blocks`. Each one has the shield
-   icon meaning Row Level Security is on.
+4. Check **Table Editor**: every table (profiles, tasks, flashcards, uploads, notes, todos, jobs,
+   shifts, transactions, budget_limits, savings_goals, habits, habit_logs and more) shows the
+   shield icon, meaning Row Level Security is on.
 
-> Re-running these files later is safe — they won't duplicate anything. Run each new
-> `supabase/migrations/*.sql` file the same way whenever one is added.
+> Running it again is always safe and never deletes your data. Run it again whenever
+> `supabase/schema.sql` changes (the commit message will say so).
 
-## 3. Turn on email magic-link login
-1. Open **Authentication → Sign In / Providers → Email**.
-2. Make sure **Email** is enabled and **"Confirm email"** is on. (Password can stay off —
-   we only use magic links.)
-3. Open **Authentication → URL Configuration** and set:
+## 3. Login settings
+1. **Authentication → Sign In / Providers → Email**: keep **Email** enabled. Turn **"Allow new
+   users to sign up"** **off**: accounts are only made through the site's Create account form,
+   which checks your invite code (it uses the service-role key, so it still works with this off).
+   "Confirm email" doesn't matter for accounts made by the form, which are confirmed already.
+2. **Authentication → URL Configuration**:
    - **Site URL**: your live site, e.g. `https://your-dashboard.vercel.app`
    - **Redirect URLs** (add each): `https://your-dashboard.vercel.app/auth/confirm`
-     and `http://localhost:3000/auth/confirm`
-4. **(Optional — you can skip this.)** The sign-in link in the default email already works,
-   because `app/auth/confirm/route.ts` handles Supabase's default link format too.
-   If you want to tidy the link anyway: left sidebar **Authentication → Emails → Templates**
-   tab → **Magic Link**, and set the link `href` to:
-   ```
-   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=magiclink
-   ```
-   then Save. (On new free-tier projects this editor can be read-only unless you add custom
-   SMTP — that's fine, just skip it.)
+     and `http://localhost:3000/auth/confirm` (used by "Forgot your password?").
 
 ## 4. Copy the Supabase keys
 Open **Project Settings → API** and copy these into Vercel (next step):
 - **Project URL** → `SUPABASE_URL`
 - **anon public / publishable** key → `SUPABASE_PUBLISHABLE_KEY`
-- **service_role** key → `SUPABASE_SERVICE_ROLE_KEY` (optional for now; keep it secret)
+- **service_role** key → `SUPABASE_SERVICE_ROLE_KEY` (needed for Create account and the daily
+  flashcard check; keep it secret, never paste it anywhere else)
 
 > The names have no `PUBLIC` prefix on purpose (Vercel rejects those). `next.config.mjs`
 > re-exposes the URL and publishable key to the browser as `NEXT_PUBLIC_…` automatically.
@@ -57,20 +47,22 @@ In **Vercel → your project → Settings → Environment Variables**, add:
 |------|-------|
 | `SUPABASE_URL` | the Project URL from step 4 |
 | `SUPABASE_PUBLISHABLE_KEY` | the publishable (anon) key from step 4 |
-| `SUPABASE_SERVICE_ROLE_KEY` | the service_role key (optional now) |
+| `SUPABASE_SERVICE_ROLE_KEY` | the service_role key from step 4 |
 | `TOKEN_ENCRYPTION_KEY` | the key I gave you in chat (keep it secret) |
+| `INVITE_CODE` | a code you choose and give to friends (e.g. three random words) |
+| `CRON_SECRET` | a long random string: run `openssl rand -hex 32` in Terminal and paste the result |
 
-Apply them to **Production, Preview and Development**, then **redeploy**.
+Apply them to **Production, Preview and Development**, then **redeploy** (Deployments → ⋯ → Redeploy).
 
 ## 6. For local development
-Open `.env.local` (already created, git-ignored) and replace the two `REPLACE-ME`
-placeholders in `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` with your Project URL
-and publishable key. The `TOKEN_ENCRYPTION_KEY` is already filled in. Then run `npm run dev`.
+Put the same names in `.env.local` (git-ignored) and run `npm run dev`.
 
-## 7. Invite yourself
-The site only lets in accounts you add. In **Authentication → Users → Add user →
-Create new user**, add your email (or just sign in once with your email and approve
-the magic link). After that, open the site, enter your email, and click the link.
+## 7. Your account, and inviting friends
+- **You**: if you used the old email-link sign-in, your account already exists. On the sign-in
+  page tap **Forgot your password?**, open the emailed link, then set a password in
+  **Settings → Your account**. (Or use **Create account** if you never signed in before.)
+- **Friends**: send them the site link and the invite code. They tap **Create account** and fill
+  in their name, email, password and the code. Each account only ever sees its own data.
 
 ## 8. (Optional) Switch on the AI features
 The **AI tutor**, **Summaries** and **HSC practice** marking need a free AI key. Add **any one**
@@ -91,6 +83,13 @@ under "more models" automatically.
 You can then choose a model from the **AI model** dropdown on each of those pages, or leave it on
 Auto. Marking a **drawn** answer needs a model that can read images: Gemini, Groq and OpenRouter
 have one, and Mistral doesn't.
+
+Free model names change often. If one stops working, you can name a replacement without any code
+change: add `GEMINI_MODEL`, `GROQ_MODEL`, `OPENROUTER_MODEL` (a `:free` model) or `MISTRAL_MODEL`
+in Vercel and redeploy, and it's tried first for that provider.
+
+Free AI tiers may use what you send to train their models, so only school content is ever sent:
+never names, emails or keys (Summaries also blanks out emails and phone numbers in uploads).
 
 Until a key is added, those three pages show a short "add a key" note. Everything else
 (Timetable, Notes, Study planner, Assignments) works without any AI key.
@@ -125,3 +124,11 @@ and password (neither Sentral nor Atlantis allows that for other apps), so use o
 No **New Access Token** button? Your school has turned tokens off. Choose **Calendar feed link** instead:
 in Canvas open **Calendar → Calendar Feed**, copy the link and paste it in. To cut off access later,
 delete the token in Canvas, or click **Disconnect** on the dashboard.
+
+## 11. Daily flashcard duplicate check
+`vercel.json` asks Vercel to call `/api/cron/dedupe-flashcards` every day at 19:00 UTC
+(about 6 am Sydney in summer, 5 am in winter). It only runs if `CRON_SECRET` is set (step 5).
+On the free Hobby plan a daily job can run up to an hour late. It only looks at cards added since
+the last check and sends just the question text to the AI. You can also press
+**Check for duplicates now** on the Flashcards page; hidden cards can be restored there.
+To see it ran: Vercel → your project → **Logs**, search "Flashcard dedupe".

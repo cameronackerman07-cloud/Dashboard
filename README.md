@@ -11,7 +11,14 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:3000.
+Then open http://localhost:3000. Copy the names from `.env.example` into `.env.local` and fill in
+your own values first; without the Supabase ones every page shows "Supabase isn't connected yet".
+`npm run build` must pass before every commit.
+
+## First-time setup
+
+Follow `SETUP.md`: create the Supabase project, run `supabase/schema.sql` in the SQL Editor, add
+the environment variables in Vercel, then invite friends with the site link and your invite code.
 
 ## Deploy
 
