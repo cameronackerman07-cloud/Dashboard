@@ -108,3 +108,109 @@ alter table public.user_settings enable row level security;
 drop policy if exists "user_settings: all own" on public.user_settings;
 create policy "user_settings: all own" on public.user_settings for all to authenticated
   using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+
+-- ===========================================================================
+-- Agents. Scheduled agents only READ the user's data and WRITE findings,
+-- reports and run logs. The tick job uses the service-role key and always
+-- filters by user_id.
+-- ===========================================================================
+create table if not exists public.agents (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  slug            text not null,
+  role            text not null default 'specialist' check (role in ('specialist', 'chief')),
+  name            text not null check (char_length(name) between 1 and 24),
+  description     text not null default '',
+  enabled         boolean not null default true,
+  schedule        jsonb not null default '{"type": "daily", "at": "07:00"}'::jsonb,
+  instructions    text not null default '',
+  config          jsonb not null default '{}'::jsonb,
+  sources         text[] not null default '{}',
+  importance_min  integer not null default 3 check (importance_min between 1 and 5),
+  daily_ai_budget integer not null default 5 check (daily_ai_budget between 0 and 100),
+  is_builtin      boolean not null default false,
+  kind            text not null default 'custom' check (kind in ('builtin', 'custom')),
+  position        jsonb,
+  last_run_at     timestamptz,
+  next_run_at     timestamptz,
+  created_at      timestamptz not null default now(),
+  unique (user_id, slug),
+  unique (id, user_id)
+);
+create index if not exists agents_due_idx on public.agents (next_run_at) where enabled;
+
+create table if not exists public.agent_runs (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  agent_id       uuid not null,
+  started_at     timestamptz not null default now(),
+  finished_at    timestamptz,
+  status         text not null default 'running' check (status in ('running', 'ok', 'error', 'skipped')),
+  ai_provider    text,
+  ai_calls       integer not null default 0,
+  findings_count integer not null default 0,
+  error          text,
+  foreign key (agent_id, user_id) references public.agents (id, user_id) on delete cascade
+);
+create index if not exists agent_runs_agent_idx on public.agent_runs (agent_id, started_at desc);
+
+create table if not exists public.agent_findings (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  agent_id    uuid not null,
+  run_id      uuid,
+  category    text not null default 'info',
+  title       text not null,
+  body        text not null default '',
+  importance  integer not null default 3 check (importance between 1 and 5),
+  dedupe_key  text not null,
+  data        jsonb not null default '{}'::jsonb,
+  action_url  text,
+  created_at  timestamptz not null default now(),
+  consumed_at timestamptz,
+  expires_at  timestamptz,
+  unique (user_id, agent_id, dedupe_key),
+  foreign key (agent_id, user_id) references public.agents (id, user_id) on delete cascade
+);
+create index if not exists agent_findings_unconsumed_idx on public.agent_findings (user_id, consumed_at, created_at desc);
+
+create table if not exists public.reports (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  kind        text not null check (kind in ('briefing', 'sunday_reset', 'alert', 'strategy', 'cleaning_hours', 'custom')),
+  title       text not null,
+  headline    text not null default '',
+  sections    jsonb not null default '[]'::jsonb,
+  finding_ids uuid[] not null default '{}',
+  created_at  timestamptz not null default now(),
+  read_at     timestamptz
+);
+create index if not exists reports_user_created_idx on public.reports (user_id, created_at desc);
+
+create table if not exists public.external_items (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  source        text not null check (source in ('canvas', 'classroom')),
+  external_id   text not null,
+  title         text not null,
+  course        text,
+  due_at        timestamptz,
+  url           text,
+  status        text,
+  first_seen_at timestamptz not null default now(),
+  last_seen_at  timestamptz not null default now(),
+  content_hash  text,
+  unique (user_id, source, external_id)
+);
+
+do $$
+declare t text;
+begin
+  foreach t in array array['agents', 'agent_runs', 'agent_findings', 'reports', 'external_items'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t || ': all own', t);
+    execute format('create policy %I on public.%I for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))', t || ': all own', t);
+    execute format('create index if not exists %I on public.%I (user_id)', t || '_user_id_idx', t);
+  end loop;
+end
+$$;
