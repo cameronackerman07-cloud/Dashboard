@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aiJson, AiError } from "@/lib/ai";
+import { analyseProfile } from "@/lib/about-me-server";
 import { sendPush } from "@/lib/push";
 import { htmlToText, fetchPage } from "@/lib/safe-fetch";
 import { addDays, dayKey, mondayOf, monthRange, monthKey, sydneyInstant } from "@/lib/time";
@@ -246,6 +247,7 @@ export function buildContext(
         if (clean.length) await db.from("money_ideas").upsert(clean, { onConflict: "user_id,dedupe_key" });
       },
     },
+    profile: { analyse: () => analyseProfile(db, userId, opts.now) },
     upsertExternal: async (rows) => {
       const now = iso(Date.now());
       for (let i = 0; i < rows.length; i += 100) {

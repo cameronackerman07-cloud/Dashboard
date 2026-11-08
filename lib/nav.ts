@@ -265,6 +265,16 @@ export const NAV: NavGroup[] = [
         built: true,
         plans: ["Ranked ideas for your situation", "Log hours and earnings", "A weekly money strategy from The BRIAN"],
       },
+      {
+        slug: "profile",
+        label: "About me",
+        short: "Me",
+        icon: "profile",
+        blurb: "What the app remembers about you",
+        phase: 4,
+        built: true,
+        plans: ["A short questionnaire", "Facts you confirm, edit or reject", "Download or forget everything"],
+      },
     ],
   },
 ];

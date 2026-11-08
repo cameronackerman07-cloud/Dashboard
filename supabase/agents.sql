@@ -445,3 +445,53 @@ begin
   end loop;
 end
 $$;
+
+-- ===========================================================================
+-- About me: facts you confirm, writing samples you choose to add, and opt-in
+-- switches. Nothing here is gathered from the web or other apps.
+-- ===========================================================================
+create table if not exists public.profile_facts (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  category   text not null check (category in ('interests', 'goals', 'skills', 'communication style', 'study habits', 'schedule patterns', 'preferences')),
+  text       text not null check (char_length(text) between 1 and 300),
+  source     text not null default 'user' check (source in ('user', 'computed', 'ai')),
+  origin     text,                       -- e.g. 'questionnaire', 'behaviour', 'style'
+  confidence numeric(3,2) not null default 1 check (confidence between 0 and 1),
+  status     text not null default 'suggested' check (status in ('suggested', 'confirmed', 'rejected')),
+  created_at timestamptz not null default now(),
+  unique (user_id, category, text)
+);
+
+create table if not exists public.writing_samples (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  title         text not null check (char_length(title) between 1 and 120),
+  text          text not null check (char_length(text) between 1 and 20000),
+  include_in_ai boolean not null default false,
+  created_at    timestamptz not null default now()
+);
+
+create table if not exists public.profile_settings (
+  user_id        uuid primary key default auth.uid() references auth.users (id) on delete cascade,
+  questionnaire  jsonb not null default '{}'::jsonb,
+  use_behaviour  boolean not null default false,
+  use_samples    boolean not null default false,
+  include_notes  boolean not null default false,
+  use_style      boolean not null default false,
+  ai_pass        boolean not null default false,
+  updated_at     timestamptz not null default now()
+);
+
+do $$
+declare t text;
+begin
+  foreach t in array array['profile_facts', 'writing_samples', 'profile_settings'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t || ': all own', t);
+    execute format('create policy %I on public.%I for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))', t || ': all own', t);
+  end loop;
+  execute 'create index if not exists profile_facts_user_id_idx on public.profile_facts (user_id)';
+  execute 'create index if not exists writing_samples_user_id_idx on public.writing_samples (user_id)';
+end
+$$;

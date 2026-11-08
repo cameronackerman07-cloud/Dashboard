@@ -92,6 +92,8 @@ export type AgentContext = {
     logged: (sinceDay: string) => Promise<{ idea_id: string; hours: number; earned_cents: number }[]>;
     save: (rows: Record<string, unknown>[]) => Promise<void>;
   };
+  // About me: refresh computed facts (and the AI pass, only if opted in) as "suggested".
+  profile: { analyse: () => Promise<{ added: number; ready: boolean }> };
   upsertExternal: (rows: { source: "canvas" | "classroom"; external_id: string; title: string; course: string | null; due_at: string | null; url: string | null; status: string | null }[]) => Promise<void>;
 };
 

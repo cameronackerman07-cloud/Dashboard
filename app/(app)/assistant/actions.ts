@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getProfileContext } from "@/lib/about-me-server";
 import { AiError, aiJson, NO_KEY_MESSAGE } from "@/lib/ai";
 import { hasUsableKey } from "@/lib/ai-keys";
 import { sanitizeForAI } from "@/lib/agents/sanitize";
@@ -213,6 +214,7 @@ export async function askAssistant(message: string, history: Turn[], model?: str
     .filter((t) => t && (t.role === "user" || t.role === "assistant") && typeof t.text === "string")
     .map((t) => ({ role: t.role, content: sanitizeForAI(t.text.slice(0, 2000)) }));
 
+  const style = await getProfileContext(supabase, userId);
   const system = `You are The BRIAN, the helper inside a NSW Year 11/12 student's study dashboard. Today is ${formatDayKeyLong(today)} (${today}), ${timeKey(now)} Sydney time.
 Pick ONE mode from the student's message:
 - "tutor": they want to learn or solve something. Give hints and guiding questions first. Only give a full worked solution if they clearly ask for it.
@@ -221,7 +223,7 @@ Pick ONE mode from the student's message:
 ${ACTION_GUIDE}
 Their subjects: ${COURSES.join(", ")}. Agents: ${agentList.map((a) => a.name).join(", ") || "none"}. Habits: ${((habits ?? []) as { name: string }[]).map((h) => h.name).join(", ") || "none"}. Pages: ${PAGES.join(", ")}.
 For a study plan just use create_study_plan; never work out times yourself. Never ask for or repeat passwords, keys, tokens or phone numbers.
-Reply with ONLY JSON: {"mode": "tutor"|"chat"|"action", "reply": string (plain text, short paragraphs), "actions": [ ... ]}. "actions" is [] unless mode is "action".`;
+Reply with ONLY JSON: {"mode": "tutor"|"chat"|"action", "reply": string (plain text, short paragraphs), "actions": [ ... ]}. "actions" is [] unless mode is "action".${style ? `\n${style} Use this only to tune your tone.` : ""}`;
 
   let parsed;
   let modelLabel = "";

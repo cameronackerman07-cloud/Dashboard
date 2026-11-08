@@ -118,3 +118,33 @@ test("money ideas: unsafe AI ideas are rejected, shape is strict", () => {
   assert.equal(ideas[0].hours, 10);
   assert.equal(parseAiIdeas("nope"), null);
 });
+
+import { behaviourFacts, cleanFact, isSensitive, questionnaireFacts, styleGuide, writingStats } from "@/lib/about-me";
+
+test("about me: sensitive topics are never stored", () => {
+  assert.equal(isSensitive("Has anxiety before exams"), true);
+  assert.equal(isSensitive("Goes to church on Sundays"), true);
+  assert.equal(cleanFact("preferences", "Likes short answers")?.text, "Likes short answers");
+  assert.equal(cleanFact("preferences", "Votes Greens"), null);
+  assert.equal(cleanFact("made-up", "x"), null);
+  assert.equal(questionnaireFacts({ goals: "99 ATAR", interests: "my therapy sessions" }).length, 1);
+});
+
+test("about me: style stats and behaviour facts in code", () => {
+  const sample = "I realised the colour of the theatre lights changed the mood. It was organised really well, and honestly it was heaps of fun. ".repeat(6);
+  const s = writingStats([sample])!;
+  assert.equal(s.spelling, "Australian");
+  assert.ok(s.avgSentence > 5);
+  assert.equal(writingStats(["too short"]), null);
+  const facts = behaviourFacts({ studyStarts: [19, 19, 20, 18, 9], habitDaysDone: 20, habitDaysPossible: 28, tasksEarlyDays: [3, 2, 4], weakTopics: [] });
+  assert.ok(facts.some((f) => f.text === "Usually studies in the evening"));
+  assert.ok(facts.some((f) => f.text.includes("days early")));
+});
+
+test("about me: style guide uses confirmed facts only and skips sensitive ones", () => {
+  assert.equal(styleGuide([]), "");
+  const g = styleGuide([{ category: "communication style", text: "Prefers direct feedback" }, { category: "preferences", text: "Mentions depression" }, { category: "interests", text: "Soccer" }]);
+  assert.ok(g.includes("Prefers direct feedback"));
+  assert.ok(!g.includes("depression"));
+  assert.ok(!g.includes("Soccer"));
+});

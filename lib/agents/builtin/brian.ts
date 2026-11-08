@@ -1,3 +1,4 @@
+import { styleGuide } from "@/lib/about-me";
 import { formatCents } from "@/lib/money";
 import { paidMinutes, formatHours, type Job, type Shift } from "@/lib/shifts";
 import { addDays, dayKey, formatTime, mondayOf, sydneyInstant, timeKey, weekday } from "@/lib/time";
@@ -48,9 +49,10 @@ async function headline(ctx: AgentContext, kind: string, sections: ReportSection
   if (!ctx.aiAvailable) return headlineFallback(sections);
   try {
     const text = sections.map((s) => `${s.heading}: ${s.points.join("; ")}`).join("\n").slice(0, 3000);
+    const style = styleGuide(await ctx.read<{ category: string; text: string }[]>("profile_confirmed").catch(() => []));
     return await ctx.ai({
       purpose: "report",
-      system: `You write the 2-3 sentence headline of a NSW Year 11 student's ${kind}. Warm, practical, no guilt or pressure, protect sleep and rest. Reply with ONLY JSON {"headline": string}.`,
+      system: `You write the 2-3 sentence headline of a NSW Year 11 student's ${kind}. Warm, practical, no guilt or pressure, protect sleep and rest.${style ? ` ${style}` : ""} Reply with ONLY JSON {"headline": string}.`,
       messages: [{ role: "user", content: `<data>\n${text}\n</data>` }],
       json: (v) => {
         const h = (v as { headline?: unknown })?.headline;
@@ -173,7 +175,7 @@ export const brian: AgentDefinition = {
   defaultName: "The BRIAN",
   description: "Your chief agent. Reads what every agent found and writes your morning briefing, Sunday reset and urgent alerts.",
   defaultSchedule: { type: "every", minutes: 30 },
-  defaultSources: ["assignments", "todos", "shifts", "calendar", "habits", "money_summary", "flashcard_stats"],
+  defaultSources: ["assignments", "todos", "shifts", "calendar", "habits", "money_summary", "flashcard_stats", "profile_confirmed"],
   defaultConfig: { briefing_at: "07:00", reset_at: "18:30", tone: "warm and direct" },
   needsAI: false,
   importanceMin: 4,
