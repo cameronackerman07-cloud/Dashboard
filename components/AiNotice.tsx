@@ -1,37 +1,22 @@
-import { Icon } from "@/components/Icon";
+import Link from "next/link";
 
-// Shown by the AI-powered pages when no provider key is set yet.
+// Shown wherever AI is needed but this user has no key the AI can use yet.
 export function AiNotice() {
   return (
-    <section className="card" aria-label="AI not set up yet">
+    <section className="card" aria-label="Add an AI key">
       <div className="card-head">
-        <h2 className="card-title">Add a free AI key to switch this on</h2>
+        <h2 className="card-title">Add a free AI key in Settings to use this</h2>
         <span className="chip-outline">AI</span>
       </div>
       <p className="lede" style={{ maxWidth: "none" }}>
-        This feature runs on a free AI model. Add any one of these keys in Vercel → Settings →
-        Environment Variables, then redeploy — it&apos;ll start working straight away.
+        AI features run on your own free key from Google Gemini, Groq, OpenRouter or Mistral. It takes about two minutes, and
+        the steps are on the AI keys page.
       </p>
-      <ul className="plan-list">
-        <li>
-          <Icon name="arrow" size={18} />
-          <span>
-            <strong>GROQ_API_KEY</strong> — free at console.groq.com (fastest to set up)
-          </span>
-        </li>
-        <li>
-          <Icon name="arrow" size={18} />
-          <span>
-            <strong>GEMINI_API_KEY</strong> — free at aistudio.google.com
-          </span>
-        </li>
-        <li>
-          <Icon name="arrow" size={18} />
-          <span>
-            <strong>OPENROUTER_API_KEY</strong>, <strong>CEREBRAS_API_KEY</strong> or <strong>MISTRAL_API_KEY</strong> also work
-          </span>
-        </li>
-      </ul>
+      <div className="note-actions">
+        <Link href="/settings/ai-keys" className="btn btn-dark">
+          Add an AI key
+        </Link>
+      </div>
     </section>
   );
 }

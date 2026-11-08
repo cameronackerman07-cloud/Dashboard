@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "vapid": "node scripts/vapid.mjs"
+    "vapid": "node scripts/vapid.mjs",
+    "reencrypt": "node scripts/reencrypt.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

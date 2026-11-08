@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
-import { aiConfigured, availableModels } from "@/lib/ai";
+import { aiReadyFor, availableModels } from "@/lib/ai";
+import { currentUserId } from "@/lib/supabase/server";
 import { matchSubject, SYLLABUS } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/server";
 import { FlashcardsClient, type ArchivedCard, type Card } from "./FlashcardsClient";
@@ -14,6 +15,8 @@ type Props = { searchParams: Promise<{ subject?: string }> };
 
 export default async function FlashcardsPage({ searchParams }: Props) {
   const { subject } = await searchParams;
+  const userId = await currentUserId();
+  const aiReady = await aiReadyFor(userId);
   const supabase = await createClient();
   const [{ data }, { data: archived }, models] = await Promise.all([
     supabase
@@ -28,7 +31,7 @@ export default async function FlashcardsPage({ searchParams }: Props) {
       .not("duplicate_of", "is", null)
       .order("deduped_at", { ascending: false })
       .limit(300),
-    aiConfigured() ? availableModels() : Promise.resolve([]),
+    aiReady ? availableModels(userId) : Promise.resolve([]),
   ]);
 
   const cards: Card[] = ((data ?? []) as Card[]).map((c) => ({ ...c, ease: Number(c.ease) }));
@@ -51,7 +54,7 @@ export default async function FlashcardsPage({ searchParams }: Props) {
         openSubject={matchSubject(subject)}
         syllabus={Object.fromEntries(Object.entries(SYLLABUS).map(([s, mods]) => [s, mods.map((m) => m.name)]))}
         models={models}
-        aiReady={aiConfigured()}
+        aiReady={aiReady}
       />
     </main>
   );

@@ -5,7 +5,7 @@ Update this after every stage. A new session continues from the first unchecked 
 - [x] Prerequisites checked — login + RLS (supabase/schema.sql), lib/ai.ts router, lib/subjects.ts, dedupe cron all exist.
 - [x] Stage A — installable app: manifest + shortcuts, iOS tags, public/sw.js (push, clicks, offline), /offline, /install, tablet rail default, safe areas, AutoRefresh on Home. AppBadge component exists; wire it to the Inbox unread count in Stage E.
 - [x] Stage B — push: web-push + `npm run vapid`, NEXT_PUBLIC_VAPID_PUBLIC_KEY mapping, supabase/agents.sql (push_subscriptions, notification_settings), lib/push.ts sendPush/decide, /api/push/subscribe + /test, /settings/notifications. Unit tests for decide/inQuietHours still to write (Housekeeping).
-- [ ] Stage C — per-user AI keys (user_api_keys, encryptSecret/decryptSecret + rotation, redactSecrets, /settings/ai-keys, callAI({userId,…}), shared fallback, budgets, AI_MOCK)
+- [x] Stage C — per-user keys: user_api_keys (RLS, no policies, revoked; PGlite-tested), lib/crypto encryptSecret/decryptSecret + PREVIOUS key + `npm run reencrypt`, lib/redact.ts, lib/ai-keys.ts (resolveKeys, budgets, ai_usage, markKey), lib/ai.ts aiChat({userId…})/callAI/aiReadyFor, AI_MOCK via lib/ai-mock.ts, /settings/ai-keys (save/test/remove, 10 tests/hour, daily budget). All callers pass userId. Owner-only env key list in Settings.
 - [ ] Stage D — agent framework (supabase/agents.sql, lib/agents/*, schedule + DST tests, tick + run routes, GitHub Actions workflow, safe-fetch upgrades, sanitizeForAI)
 - [ ] Stage E — The BRIAN, /inbox, /ai-agents orbit hub, ensureDefaultAgents
 - [ ] Stage F — Google OAuth + /calendar views, remove Compass
@@ -23,3 +23,4 @@ The repo is in iCloud and its node_modules folder is empty. Build in a scratch c
 Git in the iCloud folder is slow: run commits and pushes in the Terminal panel (one-line commands; put multi-line messages in a file and use `git commit -F`). Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never commit `.env*`.
 
 ## Notes
+- IMPORTANT for Cameron: AI now uses each person's own keys. Site (Vercel) keys only work for OWNER_EMAIL, so set OWNER_EMAIL to his email in Vercel (or add his own key in Settings → AI keys).

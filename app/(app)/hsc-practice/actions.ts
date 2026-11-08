@@ -12,7 +12,7 @@ import { bandGuide, LETTERS, type BandLevel, type Mcq } from "@/lib/hsc";
 import { normKey } from "@/lib/flashcards";
 import { parseMarking, type DraftCard, type ParsedMarking } from "@/lib/marking";
 import { cleanSubject } from "@/lib/subjects";
-import { createClient, isSignedIn } from "@/lib/supabase/server";
+import { createClient, currentUserId, isSignedIn } from "@/lib/supabase/server";
 
 const PLAIN_MATHS = `Write in plain text only: no markdown and no LaTeX, because the page can't render them.
 Write maths the way you'd type it, using characters like x², √(x), π, θ, ∫, ≤, and (a + b)/(c + d).`;
@@ -116,7 +116,8 @@ export async function generateQuestion(input: {
 }): Promise<QuestionReply> {
   const { course, topic, focus, marks, model } = input;
   if (!course) return { ok: false, text: "Pick a subject first." };
-  if (!(await isSignedIn())) return { ok: false, text: SIGNED_OUT };
+  const userId = await currentUserId();
+  if (!userId) return { ok: false, text: SIGNED_OUT };
 
   try {
     const res = await aiChat(
@@ -126,7 +127,7 @@ export async function generateQuestion(input: {
           content: `Write one HSC-style ${course} question${onTopic(topic, focus)}, worth ${marks || "a few"} marks. Make it ${bandGuide(course, cleanBand(input.band))}.`,
         },
       ],
-      { system: QUESTION_SYSTEM, temperature: 0.7, model },
+      { userId, purpose: "hsc-question", system: QUESTION_SYSTEM, temperature: 0.7, model },
     );
     return { ok: true, text: res.text, model: res.modelLabel, note: fallbackNote(model, res) };
   } catch (err) {
@@ -198,7 +199,8 @@ export async function generateMcqs(input: {
   const { course, topic, focus, model } = input;
   const count = Math.min(10, Math.max(1, Math.round(input.count) || 5));
   if (!course) return { ok: false, text: "Pick a subject first." };
-  if (!(await isSignedIn())) return { ok: false, text: SIGNED_OUT };
+  const userId = await currentUserId();
+  if (!userId) return { ok: false, text: SIGNED_OUT };
 
   try {
     const res = await aiChat(
@@ -208,7 +210,7 @@ export async function generateMcqs(input: {
           content: `Write ${count} HSC-style ${course} multiple-choice questions${onTopic(topic, focus)}. Make each ${bandGuide(course, cleanBand(input.band))}. Cover different ideas in each question.`,
         },
       ],
-      { system: MCQ_SYSTEM, temperature: 0.7, model },
+      { userId, purpose: "hsc-mcq", system: MCQ_SYSTEM, temperature: 0.7, model },
     );
     const questions = toMcqs(readJson(res.text)).slice(0, count);
     if (questions.length === 0) {
@@ -308,7 +310,8 @@ export async function markAnswer(input: {
   if (image && (image.length > MAX_IMAGE || !IMAGE_FORMAT.test(image))) {
     return { ok: false, text: "That drawing is too large to mark. Try clearing some space." };
   }
-  if (!(await isSignedIn())) return { ok: false, text: SIGNED_OUT };
+  const userId = await currentUserId();
+  if (!userId) return { ok: false, text: SIGNED_OUT };
 
   const prompt = [
     `Subject: ${course}.`,
@@ -322,6 +325,8 @@ export async function markAnswer(input: {
 
   try {
     const res = await aiChat([{ role: "user", content }], {
+      userId,
+      purpose: "hsc-mark",
       system: MARK_SYSTEM,
       temperature: 0.2,
       model,

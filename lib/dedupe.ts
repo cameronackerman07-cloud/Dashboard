@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { aiConfigured, aiJson } from "@/lib/ai";
+import { aiJson } from "@/lib/ai";
+import { hasUsableKey } from "@/lib/ai-keys";
 import { normKey } from "@/lib/flashcards";
 
 // Finds flashcards that ask the same question and hides the extras.
@@ -91,6 +92,9 @@ export async function dedupeUser(
     .limit(5000);
   if (error) throw new Error("couldn't read flashcards");
 
+  // Each user's own keys only; with none, only exact copies are found.
+  const aiReady = await hasUsableKey(userId);
+
   const bySubject = new Map<string, Card[]>();
   for (const c of (data ?? []) as Card[]) {
     const list = bySubject.get(c.subject) ?? [];
@@ -124,7 +128,7 @@ export async function dedupeUser(
     // 2. Same question, different words (AI). Sorted so cards on the same
     // module and topic land in the same batch.
     const failedIds = new Set<string>();
-    if (!aiConfigured()) {
+    if (!aiReady) {
       // No AI key yet: leave them unchecked so the AI looks once a key is added.
       cards.forEach((c) => !c.deduped_at && failedIds.add(c.id));
     } else {
@@ -147,6 +151,8 @@ export async function dedupeUser(
         try {
           const list = batch.map((c, n) => `${n + 1}. ${c.front.replace(/\s+/g, " ").slice(0, MAX_FRONT_FOR_AI)}`).join("\n");
           const { value: groups } = await aiJson([{ role: "user", content: `Questions:\n${list}` }], parseGroups(batch.length), {
+            userId,
+            purpose: "dedupe",
             system: SYSTEM,
             temperature: 0,
             model: opts.model,

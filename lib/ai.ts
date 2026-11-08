@@ -1,4 +1,8 @@
 import "server-only";
+import { createHash } from "node:crypto";
+import { budgetLeft, hasUsableKey, markKey, recordUsage, resolveKeys, type KeySet, type ProviderId } from "@/lib/ai-keys";
+import { mockReply } from "@/lib/ai-mock";
+import { redactSecrets } from "@/lib/redact";
 
 // One small AI router for the whole app. Each page can ask for a specific model
 // (the picker); otherwise we try the recommended models whose provider key is set,
@@ -45,7 +49,6 @@ export type AiResult = {
   modelLabel: string;
 };
 
-type ProviderId = "gemini" | "groq" | "openrouter" | "mistral" | "cerebras";
 
 type Provider = {
   name: string;
@@ -127,8 +130,8 @@ export class AiError extends Error {
   }
 }
 
-function keyFor(provider: ProviderId): string | undefined {
-  return process.env[PROVIDERS[provider].envKey] || undefined;
+function keyFor(set: KeySet, provider: ProviderId): string | undefined {
+  return set.keys[provider];
 }
 
 function displayName(model: Model): string {
@@ -136,9 +139,11 @@ function displayName(model: Model): string {
   return model.label.startsWith(provider) ? model.label : `${provider} ${model.label}`;
 }
 
-// True when at least one provider key is set, so the UI can show the right state.
-export function aiConfigured(): boolean {
-  return (Object.keys(PROVIDERS) as ProviderId[]).some((p) => !!keyFor(p));
+// True when this user has a key the AI can use (their own, or the site's if
+// they're allowed), so a page can show "Add a free AI key" instead of failing.
+export async function aiReadyFor(userId: string | null): Promise<boolean> {
+  if (!userId) return false;
+  return hasUsableKey(userId);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +160,8 @@ const MAX_PER_PROVIDER = 40;
 const NOT_CHAT =
   /whisper|tts|orpheus|playai|guard|safeguard|embed|imagen|veo|image|audio|live|transcri|moderation|rerank|ocr|aqa|distil/i;
 
-const discovered = new Map<ProviderId, { at: number; ok: boolean; models: Model[] }>();
+// Cached per provider AND key, since different people's keys can see different models.
+const discovered = new Map<string, { at: number; ok: boolean; models: Model[] }>();
 
 function prettyName(apiModel: string): string {
   return apiModel
@@ -212,11 +218,12 @@ function fromListing(provider: ProviderId, list: ListedModel[]): Model[] {
   return models.sort((a, b) => a.label.localeCompare(b.label)).slice(0, MAX_PER_PROVIDER);
 }
 
-async function discover(provider: ProviderId): Promise<Model[]> {
-  const key = keyFor(provider);
+async function discover(set: KeySet, provider: ProviderId): Promise<Model[]> {
+  const key = keyFor(set, provider);
   if (!key) return [];
+  const cacheKey = `${provider}:${createHash("sha256").update(key).digest("hex").slice(0, 16)}`;
 
-  const cached = discovered.get(provider);
+  const cached = discovered.get(cacheKey);
   const ttl = cached?.ok ? DISCOVERY_TTL_MS : DISCOVERY_RETRY_MS;
   if (cached && Date.now() - cached.at < ttl) return cached.models;
 
@@ -240,7 +247,7 @@ async function discover(provider: ProviderId): Promise<Model[]> {
     console.error(`AI: listing ${PROVIDERS[provider].name} models failed`);
   }
 
-  discovered.set(provider, { at: Date.now(), ok, models });
+  discovered.set(cacheKey, { at: Date.now(), ok, models });
   return models;
 }
 
@@ -256,7 +263,7 @@ function envModels(): Model[] {
   return out;
 }
 
-function recommendedModels(): Model[] {
+function recommendedModels(set: KeySet): Model[] {
   const fromEnv = envModels();
   const list: Model[] = [];
   for (const m of MODELS) {
@@ -265,13 +272,13 @@ function recommendedModels(): Model[] {
     }
     if (!fromEnv.some((e) => e.provider === m.provider && e.apiModel === m.apiModel)) list.push(m);
   }
-  return list.filter((m) => keyFor(m.provider));
+  return list.filter((m) => keyFor(set, m.provider));
 }
 
-async function allModels(): Promise<{ recommended: Model[]; extra: Model[] }> {
-  const recommended = recommendedModels();
-  const providers = (Object.keys(PROVIDERS) as ProviderId[]).filter((p) => keyFor(p));
-  const lists = await Promise.all(providers.map(discover));
+async function allModels(set: KeySet): Promise<{ recommended: Model[]; extra: Model[] }> {
+  const recommended = recommendedModels(set);
+  const providers = (Object.keys(PROVIDERS) as ProviderId[]).filter((p) => keyFor(set, p));
+  const lists = await Promise.all(providers.map((p) => discover(set, p)));
 
   const taken = new Set(recommended.map((m) => `${m.provider}:${m.apiModel}`));
   const extra = lists.flat().filter((m) => !taken.has(m.id));
@@ -279,8 +286,10 @@ async function allModels(): Promise<{ recommended: Model[]; extra: Model[] }> {
 }
 
 // The models the picker can offer: only those we hold a key for.
-export async function availableModels(): Promise<AiModelOption[]> {
-  const { recommended, extra } = await allModels();
+export async function availableModels(userId: string | null): Promise<AiModelOption[]> {
+  if (!userId) return [];
+  if (process.env.AI_MOCK === "1") return [{ id: "mock", label: "Mock AI (testing)", provider: "Mock", vision: true, recommended: true }];
+  const { recommended, extra } = await allModels(await resolveKeys(userId));
   const option = (m: Model, isRecommended: boolean): AiModelOption => ({
     id: m.id,
     label: m.label,
@@ -315,18 +324,28 @@ function stripReasoning(text: string): string {
     .trim();
 }
 
-export async function aiChat(
-  messages: AiMessage[],
-  opts: {
-    system?: string;
-    temperature?: number;
-    model?: string; // a picker id; anything else means Auto
-    needsVision?: boolean;
-    budgetMs?: number; // total time allowed across every model tried
-  } = {},
-): Promise<AiResult> {
-  const { recommended, extra } = await allModels();
-  if (recommended.length === 0) throw new AiError("No AI key is set up yet.");
+export type AiOptions = {
+  userId: string; // whose keys, budget and usage this call counts against
+  system?: string;
+  temperature?: number;
+  model?: string; // a picker id; anything else means Auto
+  needsVision?: boolean;
+  budgetMs?: number; // total time allowed across every model tried
+  purpose?: string; // what it's for (mock replies, logs): "summary", "dedupe", "tutor", …
+};
+
+export const NO_KEY_MESSAGE = "Add a free AI key in Settings → AI keys to use this.";
+
+export async function aiChat(messages: AiMessage[], opts: AiOptions): Promise<AiResult> {
+  if (process.env.AI_MOCK === "1") {
+    return { text: mockReply(opts.purpose ?? "", messages, opts.system ?? ""), modelId: "mock", modelLabel: "Mock AI" };
+  }
+  if ((await budgetLeft(opts.userId)) <= 0) {
+    throw new AiError("You've used today's AI allowance. It resets at midnight, or raise it in Settings → AI keys.");
+  }
+  const set = await resolveKeys(opts.userId);
+  const { recommended, extra } = await allModels(set);
+  if (recommended.length === 0) throw new AiError(NO_KEY_MESSAGE);
 
   const fits = (m: Model) => !opts.needsVision || m.vision;
   const picked = [...recommended, ...extra].find((m) => m.id === opts.model && fits(m));
@@ -352,12 +371,13 @@ export async function aiChat(
 
     const provider = PROVIDERS[model.provider];
     const name = displayName(model);
+    if (set.source[model.provider] === "shared" && set.sharedBudgetLeft !== null && set.sharedBudgetLeft <= 0) continue;
     try {
       const res = await fetch(provider.url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${keyFor(model.provider)}`,
+          Authorization: `Bearer ${keyFor(set, model.provider)}`,
         },
         body: JSON.stringify({
           model: model.apiModel,
@@ -371,6 +391,8 @@ export async function aiChat(
         // Status only in the logs: never the request, the key or the response body.
         console.error(`AI: ${provider.name} ${model.apiModel} responded ${res.status}`);
         failures.push(`${name}: ${reasonFor(res.status)}`);
+        if (res.status === 401 || res.status === 403) await markKey(set, model.provider, "invalid");
+        else if (res.status === 429) await markKey(set, model.provider, "rate_limited");
         continue;
       }
 
@@ -378,7 +400,12 @@ export async function aiChat(
         choices?: { message?: { content?: string | null } }[];
       };
       const text = stripReasoning(data.choices?.[0]?.message?.content ?? "");
-      if (text) return { text, modelId: model.id, modelLabel: name };
+      await recordUsage(set, model.provider);
+      if (set.sharedBudgetLeft !== null && set.source[model.provider] === "shared") set.sharedBudgetLeft--;
+      if (text) {
+        await markKey(set, model.provider, "working");
+        return { text, modelId: model.id, modelLabel: name };
+      }
 
       console.error(`AI: ${provider.name} ${model.apiModel} returned no content`);
       failures.push(`${name}: it returned an empty answer`);
@@ -418,7 +445,7 @@ export function extractJson(text: string): unknown {
 export async function aiJson<T>(
   messages: AiMessage[],
   parse: (value: unknown) => T | null,
-  opts: Parameters<typeof aiChat>[1] = {},
+  opts: AiOptions,
 ): Promise<{ value: T; result: AiResult }> {
   const first = await aiChat(messages, { temperature: 0.2, ...opts });
   const tryParse = (text: string): T | null => {
@@ -450,11 +477,28 @@ export async function aiJson<T>(
 
 // A message for the student from anything aiChat throws.
 export function aiErrorMessage(err: unknown): string {
-  return err instanceof AiError ? err.message : "Something went wrong reaching the AI. Try again.";
+  return err instanceof AiError ? redactSecrets(err.message) : "Something went wrong reaching the AI. Try again.";
 }
 
 // Tells the student if the model that answered isn't the one they picked.
 export function fallbackNote(picked: string | undefined, result: AiResult): string | undefined {
   if (!picked || picked === "auto" || picked === result.modelId) return undefined;
   return `Your picked model wasn't available for this, so ${result.modelLabel} answered instead.`;
+}
+
+// One entry point: `json` (a validator) asks for a JSON object back.
+export async function callAI<T = string>(args: {
+  userId: string;
+  messages: AiMessage[];
+  json?: (value: unknown) => T | null;
+  purpose: string;
+  system?: string;
+  model?: string;
+  temperature?: number;
+  budgetMs?: number;
+}): Promise<{ value: T; result: AiResult }> {
+  const { messages, json, ...opts } = args;
+  if (json) return aiJson(messages, json, opts);
+  const result = await aiChat(messages, opts);
+  return { value: result.text as unknown as T, result };
 }

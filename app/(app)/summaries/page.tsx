@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { AiNotice } from "@/components/AiNotice";
 import { PageHeader } from "@/components/PageHeader";
-import { aiConfigured, availableModels } from "@/lib/ai";
+import { aiReadyFor, availableModels } from "@/lib/ai";
+import { currentUserId } from "@/lib/supabase/server";
 import type { SummarySection } from "@/lib/summarise";
 import { createClient } from "@/lib/supabase/server";
 import { formatShortDate } from "@/lib/time";
@@ -12,7 +13,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export default async function SummariesPage() {
-  const enabled = aiConfigured();
+  const userId = await currentUserId();
+  const enabled = await aiReadyFor(userId);
   const supabase = await createClient();
   const [{ data }, models] = await Promise.all([
     supabase
@@ -20,7 +22,7 @@ export default async function SummariesPage() {
       .select("id, title, subject, filename, summary, card_count, truncated, created_at")
       .order("created_at", { ascending: false })
       .limit(50),
-    enabled ? availableModels() : Promise.resolve([]),
+    enabled ? availableModels(userId) : Promise.resolve([]),
   ]);
 
   const history: PastUpload[] = (data ?? []).map(

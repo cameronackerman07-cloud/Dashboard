@@ -6,6 +6,7 @@ import { CanvasConnect } from "@/components/CanvasConnect";
 import { Icon, type IconName } from "@/components/Icon";
 import { getCalendarConnections, IMPORT_SOURCE } from "@/lib/calendar";
 import { getCanvasStatus } from "@/lib/canvas";
+import { isOwner } from "@/lib/ai-keys";
 import { getProfile } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/server";
 import { formatShortDate } from "@/lib/time";
@@ -68,6 +69,10 @@ export default async function SettingsPage() {
     supabase.from("events").select("id", { count: "exact", head: true }).eq("source", IMPORT_SOURCE),
   ]);
 
+  // The site's own (Vercel) keys are only shown to the owner; everyone else
+  // manages their own keys on the AI keys page.
+  const owner = profile ? await isOwner(profile.id) : false;
+
   return (
     <main className="main main-narrow" style={{ gap: 28 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -88,6 +93,9 @@ export default async function SettingsPage() {
           </Link>
           <Link href="/settings/notifications" className="card-link">
             Notifications →
+          </Link>
+          <Link href="/settings/ai-keys" className="card-link">
+            AI keys →
           </Link>
         </div>
       </div>
@@ -128,9 +136,10 @@ export default async function SettingsPage() {
         <ConnectionList rows={DEVICES} />
       </section>
 
+      {owner ? (
       <section style={{ display: "flex", flexDirection: "column", gap: 10 }} aria-label="AI models">
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-          <h2 className="section-label">Free AI models · Auto tries them in this order</h2>
+          <h2 className="section-label">Site AI keys (owner only) · Auto tries them in this order</h2>
           <span className="list-desc">Keys live in Vercel → Settings → Environment Variables, never on this page</span>
         </div>
         <div className="list-card">
@@ -153,6 +162,7 @@ export default async function SettingsPage() {
           </div>
         </div>
       </section>
+      ) : null}
     </main>
   );
 }

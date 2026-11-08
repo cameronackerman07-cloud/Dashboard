@@ -60,7 +60,7 @@ export async function summariseUpload(form: FormData): Promise<UploadReply> {
 
   let summary;
   try {
-    summary = await summariseText(text, { subject: pickedSubject, model });
+    summary = await summariseText(text, { subject: pickedSubject, model, userId });
   } catch (err) {
     return { ok: false, message: aiErrorMessage(err) };
   }
