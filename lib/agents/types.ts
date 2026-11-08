@@ -86,6 +86,12 @@ export type AgentContext = {
   // Which sources are connected (yes/no only — never tokens).
   connections: () => Promise<{ canvas: boolean; classroom: boolean }>;
   // Agents may keep their own copy of school items (external_items) — nothing else is written.
+  // Money ideas: read your ideas (status, score, logged earnings) and save ranked ideas. Status you set is never changed.
+  ideas: {
+    list: () => Promise<{ id: string; dedupe_key: string; title: string; status: string; score: number; hours_per_week: number }[]>;
+    logged: (sinceDay: string) => Promise<{ idea_id: string; hours: number; earned_cents: number }[]>;
+    save: (rows: Record<string, unknown>[]) => Promise<void>;
+  };
   upsertExternal: (rows: { source: "canvas" | "classroom"; external_id: string; title: string; course: string | null; due_at: string | null; url: string | null; status: string | null }[]) => Promise<void>;
 };
 

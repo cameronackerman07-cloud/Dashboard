@@ -235,6 +235,17 @@ export function buildContext(
       ]);
       return { canvas: canvas.length > 0, classroom: google.some((g) => (g.scopes ?? []).includes("classroom")) };
     },
+    ideas: {
+      list: async () =>
+        safe(db.from("money_ideas").select("id, dedupe_key, title, status, score, hours_per_week").eq("user_id", userId).limit(300), [] as { id: string; dedupe_key: string; title: string; status: string; score: number; hours_per_week: number }[]),
+      logged: async (sinceDay) =>
+        safe(db.from("money_idea_log").select("idea_id, hours, earned_cents").eq("user_id", userId).gte("date", sinceDay).limit(500), [] as { idea_id: string; hours: number; earned_cents: number }[]),
+      save: async (rows) => {
+        const allowed = ["type", "title", "summary", "effort", "startup_cost_cents", "hours_per_week", "est_weekly_low_cents", "est_weekly_high_cents", "assumptions", "age_legal_notes", "first_steps", "links", "score", "dedupe_key", "verify"];
+        const clean = rows.slice(0, 50).map((r) => ({ ...Object.fromEntries(Object.entries(r).filter(([k]) => allowed.includes(k))), user_id: userId }));
+        if (clean.length) await db.from("money_ideas").upsert(clean, { onConflict: "user_id,dedupe_key" });
+      },
+    },
     upsertExternal: async (rows) => {
       const now = iso(Date.now());
       for (let i = 0; i < rows.length; i += 100) {

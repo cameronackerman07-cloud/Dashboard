@@ -96,3 +96,25 @@ test("coach settings: defaults to 99 and rejects bad values", () => {
   assert.equal(coachSettings({ target_atar: 150 }).targetAtar, 99);
   assert.deepEqual(coachSettings({ targets: { Physics: 95, Bad: 300 } }).targets, { Physics: 95 });
 });
+
+import { CATALOGUE, isSafeIdea, parseAiIdeas, parseSituation, scoreIdea } from "@/lib/money-ideas";
+
+test("money ideas: scoring prefers easy, cheap, skill-matched ideas and drops dismissed", () => {
+  const s = parseSituation({ hoursPerWeek: 4, skills: ["refereeing"], startupBudgetCents: 5000, weeklyGoalCents: 5000 });
+  const ref = CATALOGUE.find((c) => c.key === "gig:referee")!;
+  const sbat = CATALOGUE.find((c) => c.key === "apprenticeship:sbat")!;
+  assert.ok(scoreIdea(ref, s, "new") > scoreIdea(sbat, s, "new"));
+  assert.equal(scoreIdea(ref, s, "dismissed"), 0);
+  assert.ok(scoreIdea(ref, s, "trying") > scoreIdea(ref, s, "new"));
+  assert.ok(scoreIdea(ref, s, "new", true) < scoreIdea(ref, s, "new"));
+});
+
+test("money ideas: unsafe AI ideas are rejected, shape is strict", () => {
+  assert.equal(isSafeIdea("Crypto trading for teens"), false);
+  assert.equal(isSafeIdea("Dog walking"), true);
+  const ideas = parseAiIdeas({ ideas: [{ title: "Sports betting tips", summary: "x" }, { title: "Wash bins", summary: "Clean wheelie bins", effort: 9, hours: 50, extra: "y" }] })!;
+  assert.equal(ideas.length, 1);
+  assert.equal(ideas[0].effort, 5);
+  assert.equal(ideas[0].hours, 10);
+  assert.equal(parseAiIdeas("nope"), null);
+});

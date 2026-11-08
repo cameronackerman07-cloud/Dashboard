@@ -255,6 +255,16 @@ export const NAV: NavGroup[] = [
         built: true,
         plans: ["Tick off today's habits", "Current and best streaks", "The last 14 days at a glance"],
       },
+      {
+        slug: "money-ideas",
+        label: "Money ideas",
+        short: "Ideas",
+        icon: "ideas",
+        blurb: "Easy, safe ways to earn around school",
+        phase: 4,
+        built: true,
+        plans: ["Ranked ideas for your situation", "Log hours and earnings", "A weekly money strategy from The BRIAN"],
+      },
     ],
   },
 ];
