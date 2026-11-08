@@ -9,7 +9,9 @@ import {
   type AiContentPart,
 } from "@/lib/ai";
 import { bandGuide, LETTERS, type BandLevel, type Mcq } from "@/lib/hsc";
+import { normKey } from "@/lib/flashcards";
 import { parseMarking, type DraftCard, type ParsedMarking } from "@/lib/marking";
+import { cleanSubject } from "@/lib/subjects";
 import { createClient, isSignedIn } from "@/lib/supabase/server";
 
 const PLAIN_MATHS = `Write in plain text only: no markdown and no LaTeX, because the page can't render them.
@@ -239,11 +241,14 @@ async function saveCards(
       const { data, error } = await supabase
         .from("flashcards")
         .insert(
+          // The practice topic is a syllabus module (e.g. "Civil structures").
           cards.map((c) => ({
-            course: course || null,
-            topic: topic.trim().slice(0, MAX_TOPIC) || null,
+            subject: cleanSubject(course),
+            module: topic.trim().slice(0, MAX_TOPIC) || null,
+            topic: "Practice mistakes",
             front: c.front,
             back: c.back,
+            norm_key: normKey(c.front),
             due_at: new Date().toISOString(),
           })),
         )
