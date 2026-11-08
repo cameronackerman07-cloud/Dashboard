@@ -5,7 +5,7 @@ import { SUPABASE_KEY, SUPABASE_URL, supabaseConfigured } from "./env";
 // Pages anyone may see while signed out. Everything else requires a session.
 // /privacy and /terms stay public so Google's OAuth consent screen can reach them.
 // /api/auth is sign-in and sign-up; /api/cron checks its own secret.
-const PUBLIC_PATHS = ["/login", "/auth", "/privacy", "/terms", "/offline", "/install", "/sw.js", "/api/auth", "/api/cron", "/api/agents/tick"];
+const PUBLIC_PATHS = ["/login", "/auth", "/privacy", "/terms", "/offline", "/install", "/sw.js", "/api/auth", "/api/cron", "/api/agents/tick", "/api/shortcuts", "/api/calendar/feed"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

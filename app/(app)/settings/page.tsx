@@ -19,8 +19,6 @@ export const metadata: Metadata = { title: "Settings & connections" };
 type Row = { name: string; desc: string; action: string; icon: IconName };
 
 const DEVICES: Row[] = [
-  { name: "Siri & Shortcuts", desc: "“Hey Siri, what’s due?” and Reminders sync", action: "Get Shortcut", icon: "mic" },
-  { name: "Apple Calendar", desc: "Subscribe to your dashboard calendar", action: "Copy link", icon: "phone" },
   { name: "Spotify", desc: "Now playing on the home screen", action: "Connect", icon: "music" },
 ];
 
@@ -105,6 +103,9 @@ export default async function SettingsPage({ searchParams }: Props) {
           </Link>
           <Link href="/settings/ai-keys" className="card-link">
             AI keys →
+          </Link>
+          <Link href="/settings/iphone" className="card-link">
+            iPhone &amp; Siri →
           </Link>
         </div>
       </div>

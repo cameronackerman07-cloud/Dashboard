@@ -771,3 +771,6 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .btn.is-disabled { opacity: 0.55; pointer-events: none; }
 @media (max-width: 1100px) { .cal-week { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); } }
 @media (max-width: 760px) { .cal-week { grid-template-columns: 1fr; } }
+.token-box { display: block; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); font-size: 13px; overflow-wrap: anywhere; user-select: all; }
+.recipe { border-top: 1px solid var(--line-soft); padding-top: 4px; }
+.recipe code { overflow-wrap: anywhere; }

@@ -248,3 +248,35 @@ begin
 end
 $$;
 revoke all on public.oauth_connections from anon, authenticated;
+
+-- ===========================================================================
+-- iPhone, Siri and Apple Calendar. Only SHA-256 hashes of tokens are stored.
+-- ===========================================================================
+create table if not exists public.device_tokens (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  label        text not null,
+  token_hash   text not null unique,
+  scope        text not null default 'read' check (scope in ('read', 'write')),
+  last_used_at timestamptz,
+  revoked_at   timestamptz,
+  created_at   timestamptz not null default now()
+);
+create table if not exists public.calendar_tokens (
+  user_id    uuid primary key default auth.uid() references auth.users (id) on delete cascade,
+  token_hash text not null unique,
+  created_at timestamptz not null default now()
+);
+do $$
+declare t text;
+begin
+  foreach t in array array['device_tokens', 'calendar_tokens'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t || ': all own', t);
+    execute format('create policy %I on public.%I for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))', t || ': all own', t);
+  end loop;
+end
+$$;
+
+-- Cleaning-hours report: which jobs send a weekly hours summary.
+alter table public.jobs add column if not exists weekly_hours_report boolean not null default false;
