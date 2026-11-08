@@ -82,8 +82,8 @@ export function PlannerClient({ blocks, courses }: { blocks: Block[]; courses: s
 
   return (
     <>
-      <section className="card" aria-label="Add a study block">
-        <h2 className="card-title">Add a study block</h2>
+      <section className="card" aria-label="Add a repeating block">
+        <h2 className="card-title">Add a repeating block</h2>
         <form ref={formRef} action={handleAdd} className="track-form">
           <div className="track-fields">
             <select name="day" className="input" aria-label="Day" defaultValue="1">

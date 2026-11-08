@@ -1,5 +1,7 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { AiNotice } from "@/components/AiNotice";
+import { Icon } from "@/components/Icon";
 import { PageHeader } from "@/components/PageHeader";
 import { hasUsableKey } from "@/lib/ai-keys";
 import { ensureDefaultAgents } from "@/lib/agents/defaults";
@@ -80,6 +82,12 @@ export default async function AiAgentsPage() {
     <main className="main">
       <PageHeader icon="agents" title="AI Agents" lede="Each agent does one job on a schedule and reports to The BRIAN. Tap one to change it." />
       {!aiReady ? <AiNotice /> : null}
+      <div className="note-actions">
+        <Link href="/assistant" className="btn btn-dark">
+          <Icon name="sparkle" size={16} />
+          Ask The BRIAN
+        </Link>
+      </div>
       <AgentsHub
         agents={hub}
         reports={reportList}

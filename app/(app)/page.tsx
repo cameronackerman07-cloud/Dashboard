@@ -138,11 +138,11 @@ export default async function Home() {
         </Link>
       </div>
 
-      <form className="ask" action="/tutor">
+      <form className="ask" action="/assistant">
         <label>
           <Icon name="sparkle" />
-          <span className="sr-only">Ask AI or search</span>
-          <input name="q" type="text" placeholder="Ask the AI, search notes, or type a topic to practise…" />
+          <span className="sr-only">Ask The BRIAN</span>
+          <input name="q" type="text" placeholder="Ask The BRIAN, or tell it what to do: “make me a study plan for this week”" />
         </label>
         <span className="ask-meta">Free models · auto</span>
         <button type="submit" className="btn btn-dark" style={{ minHeight: 40 }}>

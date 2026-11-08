@@ -280,3 +280,61 @@ $$;
 
 -- Cleaning-hours report: which jobs send a weekly hours summary.
 alter table public.jobs add column if not exists weekly_hours_report boolean not null default false;
+
+-- ===========================================================================
+-- Study planner (dated blocks) and the assistant's undo log.
+-- study_blocks already exists (weekly repeating blocks); dated blocks are added
+-- alongside them, so old rows keep working.
+-- ===========================================================================
+create table if not exists public.study_plans (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  week_start date not null,
+  title      text not null default 'Study plan',
+  rationale  text not null default '',
+  created_by text not null default 'manual' check (created_by in ('ai', 'manual')),
+  status     text not null default 'active' check (status in ('active', 'replaced')),
+  created_at timestamptz not null default now()
+);
+alter table public.study_blocks alter column day_of_week drop not null;
+alter table public.study_blocks alter column start_min drop not null;
+alter table public.study_blocks add column if not exists plan_id   uuid;
+-- Composite key so a block can only point at its owner's own plan.
+alter table public.study_blocks drop constraint if exists study_blocks_plan_fk;
+alter table public.study_plans drop constraint if exists study_plans_id_user_key;
+alter table public.study_plans add constraint study_plans_id_user_key unique (id, user_id);
+alter table public.study_blocks add constraint study_blocks_plan_fk foreign key (plan_id, user_id) references public.study_plans (id, user_id) on delete cascade;
+alter table public.study_blocks add column if not exists starts_at timestamptz;
+alter table public.study_blocks add column if not exists ends_at   timestamptz;
+alter table public.study_blocks add column if not exists topic     text;
+alter table public.study_blocks add column if not exists kind      text not null default 'study' check (kind in ('study', 'flashcards', 'practice', 'rest'));
+alter table public.study_blocks add column if not exists source    text not null default 'manual' check (source in ('ai', 'manual'));
+alter table public.study_blocks add column if not exists done      boolean not null default false;
+alter table public.study_blocks add column if not exists notes     text;
+create index if not exists study_blocks_user_start_idx on public.study_blocks (user_id, starts_at);
+
+create table if not exists public.assistant_actions (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  action      text not null,
+  summary     text not null,
+  created_ids jsonb not null default '{}'::jsonb,   -- {"table": ["id", ...]}
+  undone_at   timestamptz,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.user_settings add column if not exists max_study_min_school_day integer not null default 210;
+alter table public.user_settings add column if not exists max_study_min_free_day   integer not null default 300;
+alter table public.user_settings add column if not exists rest_day                 smallint not null default 7 check (rest_day between 1 and 7);
+
+do $$
+declare t text;
+begin
+  foreach t in array array['study_plans', 'assistant_actions'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t || ': all own', t);
+    execute format('create policy %I on public.%I for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))', t || ': all own', t);
+    execute format('create index if not exists %I on public.%I (user_id)', t || '_user_id_idx', t);
+  end loop;
+end
+$$;

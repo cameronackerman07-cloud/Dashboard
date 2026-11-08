@@ -21,6 +21,12 @@ const MOCKS: Record<string, (user: string) => unknown> = {
   }),
   dedupe: () => ({ groups: [] }),
   findings: () => ({ findings: [] }),
+  assistant: (user) =>
+    /plan/i.test(user)
+      ? { mode: "action", reply: "Here's a plan for this week (mock).", actions: [{ type: "create_study_plan", week: "this" }] }
+      : /to-?do/i.test(user)
+        ? { mode: "action", reply: "I'll add that (mock).", actions: [{ type: "add_todo", title: user.replace(/^.*to-?do:?\s*/i, "").slice(0, 80) || "Mock to-do", priority: 2 }] }
+        : { mode: "chat", reply: `Mock answer (AI_MOCK=1). You asked: ${user.slice(0, 120)}`, actions: [] },
   report: () => ({ headline: "Mock briefing: nothing urgent today.", sections: [{ heading: "Today", points: ["Mock point."] }] }),
 };
 

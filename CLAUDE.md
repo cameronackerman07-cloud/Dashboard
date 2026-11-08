@@ -46,6 +46,15 @@ Read this before every task. Keep it up to date when decisions change.
   course list, "My courses" first), `SYLLABUS` suggested modules (the seven courses come from
   `lib/hsc.ts` TOPICS), `cleanSubject`/`optionalSubject`. `components/SubjectSelect.tsx` is the picker
   used on Summaries, Flashcards, To-do and Notes. Modules and topics stay free text.
+- Study planner (`/planner`): dated blocks (`study_blocks.starts_at/ends_at`, `plan_id` → `study_plans`) plus the
+  older repeating blocks (`day_of_week/start_min`, still shown under "Every week"). `lib/planner/free-time.ts` works
+  out free windows; the AI only picks subjects/topics/kinds, then `lib/planner/validate.ts` checks every block (inside
+  a free window, no overlaps, 20–120 min, daily caps from `user_settings`, rest day, one rest block). Never trust the
+  AI's times.
+- Assistant (`/assistant`, "Ask The BRIAN"): JSON reply `{mode, reply, actions}` parsed by `lib/assistant/schema.ts`
+  (strict allowlist, no deleting/editing existing data). Actions are previewed and only run on Apply (or at once for
+  tiny ones if "Ask before changing things" is off); `lib/assistant/apply.ts` writes with the user's RLS client and
+  logs created row ids in `assistant_actions` for Undo. Only the student's typed message reaches the model.
 - `components/PageHeader.tsx` — shared breadcrumb + icon + title + lede for built pages.
 - `components/DueSoon.tsx` — Home's live "Due soon" card. `lib/tasks.ts` — shared task shape +
   `formatDue` (pass `now` only after mount to avoid hydration mismatches).

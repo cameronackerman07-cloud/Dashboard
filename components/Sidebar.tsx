@@ -120,9 +120,18 @@ export function Sidebar({
               );
             })}
             <Link
-              href="/settings"
+              href="/assistant"
               className="rail-link"
               style={{ marginTop: "auto" }}
+              aria-current={pathname === "/assistant" ? "page" : undefined}
+              title="Ask The BRIAN"
+            >
+              <Icon name="sparkle" />
+              <span>Ask</span>
+            </Link>
+            <Link
+              href="/settings"
+              className="rail-link"
               aria-current={settingsActive ? "page" : undefined}
               title="Settings & connections"
             >
@@ -182,6 +191,10 @@ export function Sidebar({
             ))}
 
             <div className="sidebar-foot">
+              <Link href="/assistant" className="nav-link" aria-current={pathname === "/assistant" ? "page" : undefined}>
+                <Icon name="sparkle" />
+                <span className="label">Ask The BRIAN</span>
+              </Link>
               {installed ? null : (
                 <Link href="/install" className="nav-link">
                   <Icon name="phone" />
