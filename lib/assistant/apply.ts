@@ -11,7 +11,7 @@ import type { BlockKind, ValidBlock } from "@/lib/planner/validate";
 
 type Created = Record<string, string[]>;
 
-async function record(action: string, summary: string, created: Created): Promise<string | null> {
+export async function record(action: string, summary: string, created: Created | Record<string, unknown>): Promise<string | null> {
   const supabase = await createClient();
   const { data } = await supabase.from("assistant_actions").insert({ action, summary: summary.slice(0, 300), created_ids: created }).select("id").single();
   return (data?.id as string) ?? null;
@@ -155,16 +155,25 @@ export async function applyLogHabit(h: { habit: string }) {
 }
 
 // Removes exactly the rows an action made.
-const UNDO_TABLES = new Set(["study_plans", "study_blocks", "todos", "notes", "flashcards", "habit_logs", "budget_plans", "study_guides"]);
+const UNDO_TABLES = new Set(["study_plans", "study_blocks", "todos", "notes", "flashcards", "habit_logs", "budget_plans", "study_guides", "life_items"]);
+// Rows an action changed (not made) can be put back: { _restore: [{ table, id, values }] }.
+const RESTORE_TABLES = new Set(["life_items", "study_blocks"]);
+const RESTORE_COLUMNS = new Set(["starts_at", "ends_at", "status"]);
 export async function undoAction(id: string): Promise<{ ok: boolean; message: string }> {
   const supabase = await createClient();
   const { data } = await supabase.from("assistant_actions").select("created_ids, undone_at, summary").eq("id", id).maybeSingle();
   if (!data) return { ok: false, message: "Nothing to undo." };
   if (data.undone_at) return { ok: true, message: "Already undone." };
-  const created = (data.created_ids ?? {}) as Created;
+  const created = (data.created_ids ?? {}) as Created & { _restore?: { table: string; id: string; values: Record<string, unknown> }[] };
+  for (const r of Array.isArray(created._restore) ? created._restore.slice(0, 50) : []) {
+    if (!RESTORE_TABLES.has(r.table) || typeof r.id !== "string") continue;
+    const values = Object.fromEntries(Object.entries(r.values ?? {}).filter(([k]) => RESTORE_COLUMNS.has(k)));
+    if (Object.keys(values).length) await supabase.from(r.table).update(values).eq("id", r.id);
+  }
   // Children before parents.
-  for (const table of ["study_blocks", "habit_logs", "flashcards", "todos", "notes", "study_plans", "budget_plans", "study_guides"]) {
-    const ids = (created[table] ?? []).filter((x) => typeof x === "string").slice(0, 200);
+  for (const table of ["study_blocks", "habit_logs", "flashcards", "todos", "notes", "study_plans", "budget_plans", "study_guides", "life_items"]) {
+    const list = created[table];
+    const ids = (Array.isArray(list) ? list : []).filter((x) => typeof x === "string").slice(0, 200);
     if (ids.length && UNDO_TABLES.has(table)) await supabase.from(table).delete().in("id", ids);
   }
   await supabase.from("assistant_actions").update({ undone_at: new Date().toISOString() }).eq("id", id);

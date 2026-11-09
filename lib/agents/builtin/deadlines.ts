@@ -93,6 +93,19 @@ export const deadlines: AgentDefinition = {
       dedupeKey: `load:${weekStart}:${load}`,
       data: { load, weekStart },
     });
+    // Life + study + work over capacity (from My life's balance check; totals only).
+    const life = await ctx.read<Record<"thisWeek" | "nextWeek", { weekStart: string; violations: { kind: string }[]; totals: { downtimeAvg: number }; targets: { downtime: number } }>>("life_balance").catch(() => null);
+    const wk = life ? (weekStart === mondayOf(today) ? life.thisWeek : life.nextWeek) : null;
+    if (wk && (wk.violations.some((v) => v.kind === "sleep" || v.kind === "study_cap") || wk.totals.downtimeAvg < wk.targets.downtime / 2)) {
+      findings.push({
+        category: "over_capacity",
+        title: `Week of ${formatShortDate(from)} looks over capacity`,
+        body: "Life plans, study and work add up to more than fits this week. Check My life for what could move, and keep your sleep and rest block.",
+        importance: 3,
+        dedupeKey: `capacity:${weekStart}`,
+        actionUrl: "/life",
+      });
+    }
     return findings;
   },
 };

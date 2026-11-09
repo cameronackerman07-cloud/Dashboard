@@ -20,7 +20,8 @@ export type AssistantAction =
   | { type: "start_study_timer"; minutes: number; subject: string; topic: string | null }
   | { type: "pause_study_timer" }
   | { type: "stop_study_timer" }
-  | { type: "study_hours_summary" };
+  | { type: "study_hours_summary" }
+  | { type: "should_i_go"; what: string; day: string; start: string; minutes: number; category: string; want: number };
 
 export type ActionType = AssistantAction["type"];
 
@@ -40,6 +41,7 @@ export const ACTION_TYPES: ActionType[] = [
   "pause_study_timer",
   "stop_study_timer",
   "study_hours_summary",
+  "should_i_go",
 ];
 
 // Small enough to apply straight away when "Ask before changing things" is off.
@@ -131,6 +133,23 @@ export function parseAction(raw: unknown, pages: string[]): AssistantAction | nu
       if (!Number.isFinite(minutes) || minutes < 1 || minutes > 720) return null;
       return { type: "start_study_timer", minutes, subject: str(o.subject, 80) || "Study", topic: opt(o.topic, 120) };
     }
+    case "should_i_go": {
+      const day = str(o.day, 10);
+      const start = str(o.start, 5).padStart(5, "0");
+      const minutes = Math.round(Number(o.minutes ?? 180));
+      if (!DAY.test(day) || !TIME.test(start)) return null;
+      const cats = ["social", "fitness", "family", "work", "hobby", "rest", "errands", "travel", "other"];
+      const want = Math.round(Number(o.want ?? 3));
+      return {
+        type: "should_i_go",
+        what: str(o.what, 120) || "Plan",
+        day,
+        start,
+        minutes: Number.isFinite(minutes) ? Math.min(960, Math.max(15, minutes)) : 180,
+        category: cats.includes(String(o.category)) ? String(o.category) : "social",
+        want: want >= 1 && want <= 5 ? want : 3,
+      };
+    }
     case "pause_study_timer":
     case "stop_study_timer":
     case "study_hours_summary":
@@ -173,4 +192,5 @@ export const ACTION_GUIDE = `Allowed actions (JSON objects with a "type"):
 - {"type":"pause_study_timer"}
 - {"type":"stop_study_timer"}  (finishes and saves the running timer)
 - {"type":"study_hours_summary"}  (how much they've studied; the site fills in the numbers)
+- {"type":"should_i_go","what":string,"day":"YYYY-MM-DD","start":"HH:MM","minutes":number,"category":"social"|"fitness"|"family"|"work"|"hobby"|"rest"|"errands"|"travel"|"other","want":1-5}  (when they ask whether to go to something; the site checks their real week)
 You cannot delete or edit existing things.`;

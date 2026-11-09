@@ -868,3 +868,20 @@ details > summary.btn { list-style: none; display: inline-flex; margin-bottom: 1
 .slide-jump a { min-height: 36px; display: inline-flex; align-items: center; padding: 0 10px; text-decoration: none; }
 .card-pick { cursor: pointer; align-items: flex-start; }
 .check-input { width: 22px; height: 22px; flex: none; accent-color: var(--ink); margin-top: 2px; }
+
+/* ---------- My life ---------- */
+.quick-add { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.life-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 16px; align-items: start; }
+.life-days { display: flex; flex-direction: column; gap: 10px; }
+.life-day { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.life-day.is-today { border-color: var(--ink); }
+.life-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line-soft); }
+.life-row .task-body { flex: 1 1 200px; }
+.life-shift .task-title, .life-event .task-title { color: var(--ink-2); }
+.life-study { border-left: 3px solid var(--ink-2); padding-left: 8px; }
+.balance-bar { grid-template-columns: minmax(110px, 1fr) 1.2fr auto; }
+.advice-verdict { font-size: 22px; font-weight: 700; }
+.advice { border: 1.5px solid var(--ink); }
+.support-note { border: 1.5px solid var(--ink); border-radius: var(--radius-sm); padding: 12px 14px; font-weight: 500; }
+.day-pick { min-width: 64px; }
+@media (max-width: 1000px) { .life-layout { grid-template-columns: 1fr; } }

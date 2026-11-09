@@ -9,6 +9,8 @@ import { sanitizeForAI } from "./sanitize";
 import { ALWAYS_SOURCES, type AgentContext, type AgentRow, type NewReport, type ReportKind, type SourceId, type StoredFinding } from "./types";
 import { bySubject, dailyTotals, sumBetween, type StudySession } from "@/lib/study-time";
 import { countdownLabel } from "@/lib/hsc-dates";
+import { busyIntervals, expand, prefsFrom, type LifeItem } from "@/lib/life";
+import { scoreWeek } from "@/lib/planner/balance";
 
 // Builds what an agent can see. Every query uses the service-role client, so
 // every one is filtered by user_id explicitly. Agents never get keys, tokens or
@@ -152,6 +154,35 @@ export async function readSource(db: Db, userId: string, source: SourceId, agent
         lastWeekBySubject: bySubject(lastWeekRows),
         perDay: Array.from({ length: 14 }, (_, i) => addDays(today, i - 13)).map((d) => ({ day: d, seconds: days.get(d) ?? 0 })),
       };
+    }
+    case "life_balance": {
+      // Totals and free evenings only: titles of life items never leave this function.
+      const out: Record<string, unknown> = {};
+      const [items, prefRow, shifts, blocks] = await Promise.all([
+        safe(db.from("life_items").select("*").eq("user_id", userId).neq("status", "skipped").limit(500), [] as LifeItem[]),
+        safe(db.from("life_preferences").select("*").eq("user_id", userId).maybeSingle(), null as never),
+        safe(db.from("shifts").select("starts_at, ends_at").eq("user_id", userId).gte("starts_at", iso(sydneyInstant(addDays(mondayOf(today), 0)))).lt("starts_at", iso(sydneyInstant(addDays(mondayOf(today), 14)))), [] as { starts_at: string; ends_at: string }[]),
+        safe(db.from("study_blocks").select("starts_at, ends_at, kind").eq("user_id", userId).not("starts_at", "is", null).gte("starts_at", iso(sydneyInstant(mondayOf(today)))).lt("starts_at", iso(sydneyInstant(addDays(mondayOf(today), 14)))), [] as { starts_at: string; ends_at: string; kind: string }[]),
+      ]);
+      const prefs = prefsFrom(prefRow);
+      for (const [label, weekStart] of [["thisWeek", mondayOf(today)], ["nextWeek", addDays(mondayOf(today), 7)]] as const) {
+        const from = sydneyInstant(weekStart);
+        const to = sydneyInstant(addDays(weekStart, 7));
+        const life = expand(items, from, to, weekStart, 7);
+        const sh = shifts.map((x) => ({ start: new Date(x.starts_at).getTime(), end: new Date(x.ends_at).getTime() })).filter((x) => x.start < to && x.end > from);
+        const st = blocks.map((b) => ({ start: new Date(b.starts_at).getTime(), end: new Date(b.ends_at).getTime(), kind: b.kind })).filter((x) => x.start < to && x.end > from);
+        const bal = scoreWeek({ weekStart, prefs, study: st, life, shifts: sh });
+        // Free evenings (5pm–9:30pm with nothing booked) from today on.
+        const busy = [...busyIntervals(life), ...sh, ...st];
+        const freeEvenings = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+          .filter((d) => d >= today)
+          .filter((d) => {
+            const span = { start: sydneyInstant(d, "17:00"), end: sydneyInstant(d, "21:30") };
+            return !busy.some((b) => b.start < span.end && b.end > span.start);
+          });
+        out[label] = { weekStart, totals: bal.totals, targets: bal.targets, violations: bal.violations.map((v) => ({ kind: v.kind, day: v.day })), warnings: bal.warnings, freeEvenings };
+      }
+      return out;
     }
     case "key_dates": {
       const dates = await safe(

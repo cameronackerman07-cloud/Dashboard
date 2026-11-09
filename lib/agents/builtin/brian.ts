@@ -15,6 +15,8 @@ type Task = { id: string; title: string; course: string | null; due_at: string |
 type Todo = { id: string; title: string; due_on: string | null; subject: string | null };
 type Lesson = { day_of_week: number; period: string | null; subject: string; room: string | null; week: string };
 type StudyTime = { today: number; yesterday: number; week: number; lastWeek: number; total: number; weekBySubject: { subject: string; seconds: number }[]; lastWeekBySubject: { subject: string; seconds: number }[] };
+type WeekBalance = { weekStart: string; totals: { sleepAvg: number; studyMin: number; movement: number; socialMin: number; restBlocks: number; downtimeAvg: number }; targets: { sleep: number; movement: number; socialMin: number; downtime: number }; violations: { kind: string; day: string | null }[]; warnings: string[]; freeEvenings: string[] };
+type LifeBalance = { thisWeek: WeekBalance; nextWeek: WeekBalance };
 type KeyDates = { hsc: { days: number; parts: string; date: string }; dates: { title: string; starts_at: string; kind: string; course: string | null }[] };
 
 const WEATHER: Record<number, string> = {
@@ -119,6 +121,14 @@ async function briefing(ctx: AgentContext, findings: StoredFinding[]): Promise<N
   ];
   if (studyPoints.length) sections.push({ heading: "Study", points: studyPoints });
 
+  // Protect the only free evening left this week.
+  const life = await ctx.read<LifeBalance>("life_balance").catch(() => null);
+  if (life && life.thisWeek.freeEvenings.length === 1) {
+    const d = life.thisWeek.freeEvenings[0];
+    const name = new Intl.DateTimeFormat("en-AU", { timeZone: "UTC", weekday: "long" }).format(new Date(`${d}T00:00:00Z`));
+    sections.push({ heading: "Protect", points: [`${name} evening is your only free block this week. Protect it.`] });
+  }
+
   // The HSC countdown: every Monday, and on milestone days.
   const kd = await ctx.read<KeyDates>("key_dates").catch(() => null);
   if (kd && kd.hsc.days > 0 && (weekday(ctx.now) === 1 || isMilestone(kd.hsc.days))) {
@@ -196,6 +206,20 @@ async function sundayReset(ctx: AgentContext, findings: StoredFinding[]): Promis
       return `${sub}: ${hoursText(did)}${plan ? ` of ${hoursText(plan)} planned` : ""}`;
     });
     sections.push({ heading: "Study this week", points: [`${hoursText(study.week)} of external study this week (${hoursText(study.total)} in total).`, ...points] });
+  }
+
+  // Balance for the week ahead (totals only).
+  const life = await ctx.read<LifeBalance>("life_balance").catch(() => null);
+  if (life) {
+    const w = life.nextWeek;
+    sections.push({
+      heading: "Balance next week",
+      points: [
+        `Sleep about ${w.totals.sleepAvg} h a night (target ${w.targets.sleep} h), ${w.totals.movement} of ${w.targets.movement} exercise sessions, ${Math.round(w.totals.socialMin / 6) / 10} h of social and family time.`,
+        ...(w.violations.length ? [`${w.violations.length} thing${w.violations.length === 1 ? " needs" : "s need"} fixing in the plan (open My life).`] : []),
+        ...w.warnings.slice(0, 2),
+      ],
+    });
   }
 
   const fs = findingsSection(ctx, findings, 6);

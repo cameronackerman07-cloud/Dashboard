@@ -273,6 +273,7 @@ export const NAV: NavGroup[] = [
         icon: "life",
         blurb: "Your week outside school, kept in balance",
         phase: 6,
+        built: true,
         
         plans: ["Training, family, social and work in one week view", "Asks \"Should I go?\" against your real schedule"],
       },

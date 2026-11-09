@@ -7,6 +7,8 @@ import { COURSES } from "@/lib/nav";
 import { googleEvents } from "@/lib/sources/google";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, dayKey, formatDayKey, sydneyInstant, timeKey, weekdayOfKey } from "@/lib/time";
+import { busyIntervals, expand, prefsFrom, sleepWindow, type LifeItem } from "@/lib/life";
+import { repairStudy } from "./balance";
 import { freeWindows, type Interval } from "./free-time";
 import { parseProposed, validateBlocks, type Limits, type ProposedBlock, type ValidBlock } from "./validate";
 
@@ -35,24 +37,39 @@ export async function draftPlan(userId: string, weekStart: string, opts: { model
     loadEvents(from, to).catch(() => ({ events: [] as { start: number; end: number; allDay: boolean }[], error: null })),
     googleEvents(userId).catch(() => []),
   ]);
+  // My life: plans are busy time (travel included) and the preferences protect sleep and rest.
+  const [{ data: lifeRows }, { data: prefRow }, { data: bigDates }] = await Promise.all([
+    supabase.from("life_items").select("*").neq("status", "skipped").limit(500),
+    supabase.from("life_preferences").select("*").maybeSingle(),
+    supabase.from("key_dates").select("starts_at").in("kind", ["exam", "trial", "assessment"]).gte("starts_at", iso(from)).lt("starts_at", iso(to + 14 * 86_400_000)).limit(1),
+  ]);
+  const prefs = prefsFrom(prefRow as never);
+  const lifeOcc = expand((lifeRows ?? []) as LifeItem[], from, to, weekStart, 7);
+  const examWeek = (bigDates ?? []).length > 0;
 
   const busy: Interval[] = [
     ...((shifts ?? []) as { starts_at: string; ends_at: string }[]).map((s) => ({ start: new Date(s.starts_at).getTime() - 30 * 60_000, end: new Date(s.ends_at).getTime() + 30 * 60_000 })),
     ...((blocks ?? []) as { starts_at: string; ends_at: string; source: string }[]).filter((b) => b.source === "manual").map((b) => ({ start: new Date(b.starts_at).getTime(), end: new Date(b.ends_at).getTime() })),
     ...links.events.filter((e) => !e.allDay).map((e) => ({ start: e.start, end: e.end })),
     ...google.filter((g) => !g.allDay && g.start < to && g.end > from).map((g) => ({ start: g.start, end: g.end })),
+    ...busyIntervals(lifeOcc),
   ];
 
-  const sleepStart = (settings?.sleep_start as string) ?? "22:00";
-  const sleepEnd = (settings?.sleep_end as string) ?? "06:30";
+  // With My life preferences saved, sleep and wind-down come from them.
+  const night = sleepWindow(prefs, weekStart);
+  const sleepStart = prefRow ? timeKey(night.start - prefs.wind_down_min * 60_000) : ((settings?.sleep_start as string) ?? "22:00");
+  const sleepEnd = prefRow ? prefs.school_wake : ((settings?.sleep_end as string) ?? "06:30");
   const windows = freeWindows({ weekStart, busy, sleepStart, sleepEnd, now: Date.now() });
 
   const dueItems = ((tasks ?? []) as { title: string; course: string | null; due_at: string }[]).filter((t) => t.due_at);
   const load = dueItems.filter((t) => new Date(t.due_at).getTime() < to).length + ((shifts ?? []) as unknown[]).length;
   const heavy = load >= 8;
+  const schoolCap = prefRow ? prefs.max_study_school_day_min : ((settings?.max_study_min_school_day as number) ?? 210);
+  const freeCap = prefRow ? prefs.max_study_weekend_min : ((settings?.max_study_min_free_day as number) ?? 300);
+  const examFactor = examWeek ? 1.25 : 1;
   const limits: Limits = {
-    maxSchoolDayMin: Math.round(((settings?.max_study_min_school_day as number) ?? 210) * (heavy ? 0.7 : 1)),
-    maxFreeDayMin: Math.round(((settings?.max_study_min_free_day as number) ?? 300) * (heavy ? 0.7 : 1)),
+    maxSchoolDayMin: Math.round(schoolCap * (heavy ? 0.7 : 1) * examFactor),
+    maxFreeDayMin: Math.round(freeCap * (heavy ? 0.7 : 1) * examFactor),
     restDay: (settings?.rest_day as number) ?? 7,
   };
 
@@ -131,7 +148,15 @@ export async function draftPlan(userId: string, weekStart: string, opts: { model
     rationale = "Made without AI: time spread across your priorities. Add an AI key for a smarter plan.";
   }
 
-  const { blocks: valid, rejected, addedRest } = validateBlocks(proposed, windows, limits, weekDays);
-  const notes = [heavy ? "It's a heavy week, so this plan is lighter than usual. Look after your sleep." : null, rejected ? `${rejected} suggested block${rejected === 1 ? " didn't" : "s didn't"} fit your free time and ${rejected === 1 ? "was" : "were"} left out.` : null, addedRest ? "A rest block was added." : null].filter(Boolean);
+  const checked = validateBlocks(proposed, windows, limits, weekDays);
+  // Balance check: nothing in the sleep window or wind-down, nothing over a day's cap.
+  const { kept, dropped } = repairStudy(
+    checked.blocks.map((b) => ({ ...b, start: new Date(b.starts_at).getTime(), end: new Date(b.ends_at).getTime() })),
+    { weekStart, prefs, life: lifeOcc, shifts: [], examWeek },
+  );
+  const valid: ValidBlock[] = kept.map(({ start: _s, end: _e, ...b }) => b);
+  const rejected = checked.rejected + dropped;
+  const addedRest = checked.addedRest;
+  const notes = [heavy ? "It's a heavy week, so this plan is lighter than usual. Look after your sleep." : null, examWeek ? "A big assessment is coming up, so a little more study is allowed. Sleep and your rest block stay protected." : null, rejected ? `${rejected} suggested block${rejected === 1 ? " didn't" : "s didn't"} fit your free time and ${rejected === 1 ? "was" : "were"} left out.` : null, addedRest ? "A rest block was added." : null].filter(Boolean);
   return { weekStart, title, rationale, blocks: valid, note: notes.join(" ") || null, byAI };
 }

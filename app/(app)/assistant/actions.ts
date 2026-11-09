@@ -9,13 +9,16 @@ import { applyAddBlock, applyAddNote, applyAddTodo, applyCreateFlashcards, apply
 import { ACTION_GUIDE, INSTANT_ACTIONS, parseAction, parseAssistantReply, TINY_ACTIONS, type AssistantAction, type AssistantMode } from "@/lib/assistant/schema";
 import { finishSession, pauseSession, startSession, studySummary } from "@/lib/study-sessions";
 import { hoursSpoken } from "@/lib/study-time";
+import { advise, CLOSING, draftFrom } from "@/lib/life/advisor";
+import type { LifeCategory } from "@/lib/life";
+import { soundsDistressed, SUPPORT_MESSAGE } from "@/lib/life/support";
 import { buildPlan, gatherFacts, savePlan } from "@/lib/budget-plan";
 import { isBudgetPlan, normalizePlan, planTotals, type BudgetPlan } from "@/lib/budget-plan-core";
 import { formatCents } from "@/lib/money";
 import { ALL_ITEMS, COURSES } from "@/lib/nav";
 import { draftPlan, type PlanDraft } from "@/lib/planner/generate";
 import { createClient, currentUserId } from "@/lib/supabase/server";
-import { addDays, dayKey, formatDayKeyLong, mondayOf, timeKey } from "@/lib/time";
+import { addDays, dayKey, formatDayKeyLong, mondayOf, sydneyInstant, timeKey } from "@/lib/time";
 import { isUuid, SAVE_FAILED, SIGNED_OUT, type Reply } from "@/lib/validate";
 import { renameAgent } from "../ai-agents/actions";
 
@@ -114,6 +117,14 @@ async function prepare(userId: string, action: AssistantAction, agents: { id: st
       return { key, action, tiny: true, summary: "Finish and save the study timer." };
     case "study_hours_summary":
       return { key, action, tiny: true, summary: "Check your study hours." };
+    case "should_i_go": {
+      // A draft that isn't saved: evaluated against the real week, then the student decides on My life.
+      const start = sydneyInstant(action.day, action.start);
+      const advice = await advise(await createClient(), userId, draftFrom({ category: action.category as LifeCategory, start, end: start + action.minutes * 60_000, travelBefore: 20, travelAfter: 20, want: action.want }));
+      const verdict = { go: "Go", "go but shorter": "Go, but make it shorter", swap: "Go, and swap something", skip: "Probably skip this one" }[advice.verdict];
+      const alt = advice.alternatives[0] ? ` Option: ${advice.alternatives[0].label}.` : "";
+      return { key, action, tiny: true, href: "/life", summary: `${verdict}. ${advice.reasons.join(" ")}${alt} ${CLOSING} Open My life to add it and plan around your choice.` };
+    }
   }
 }
 
@@ -227,7 +238,9 @@ export async function askAssistant(message: string, history: Turn[], model?: str
   if (!userId) return SIGNED_OUT;
   const text = String(message ?? "").trim().slice(0, 4000);
   if (!text) return { ok: false, message: "Type a message first." };
-  if (!(await hasUsableKey(userId))) return { ok: false, message: NO_KEY_MESSAGE };
+  // Checked in memory only. Nothing about how the student feels is stored or analysed.
+  const support = soundsDistressed(text) ? SUPPORT_MESSAGE : null;
+  if (!(await hasUsableKey(userId))) return support ? { ok: true, message: "", mode: "chat", reply: support, proposals: [], applied: [] } : { ok: false, message: NO_KEY_MESSAGE };
 
   const supabase = await createClient();
   const [{ data: agents }, { data: habits }, { data: settings }] = await Promise.all([
@@ -252,7 +265,8 @@ Pick ONE mode from the student's message:
 - "action": they asked you to DO something in the site. Only use actions they asked for.
 ${ACTION_GUIDE}
 Their subjects: ${COURSES.join(", ")}. Agents: ${agentList.map((a) => a.name).join(", ") || "none"}. Habits: ${((habits ?? []) as { name: string }[]).map((h) => h.name).join(", ") || "none"}. Pages: ${PAGES.join(", ")}.
-For a study plan just use create_study_plan; never work out times yourself. Never ask for or repeat passwords, keys, tokens or phone numbers.
+For a study plan just use create_study_plan; never work out times yourself. For "should I go to X" questions use should_i_go: never decide for them, and never lecture about parties or friends.
+If they sound overwhelmed, stressed or unsafe, be kind and supportive first, suggest talking to a trusted adult, and give no medical advice. Never ask for or repeat passwords, keys, tokens or phone numbers.
 Reply with ONLY JSON: {"mode": "tutor"|"chat"|"action", "reply": string (plain text, short paragraphs), "actions": [ ... ]}. "actions" is [] unless mode is "action".${opts?.voice ? "\nThis came from voice and your reply will be read aloud: reply in one to three short spoken sentences, no markdown or lists, and say numbers naturally." : ""}${style ? `\n${style} Use this only to tune your tone.` : ""}`;
 
   let parsed;
@@ -287,12 +301,14 @@ Reply with ONLY JSON: {"mode": "tutor"|"chat"|"action", "reply": string (plain t
   // "Ask before changing things" off: tiny, ready actions happen now.
   const askFirst = settings?.ask_before_changes !== false;
   if (!askFirst) {
-    for (const p of proposals.filter((x) => x.tiny && !x.unavailable && x.action.type !== "open_page")) {
+    for (const p of proposals.filter((x) => x.tiny && !x.unavailable && !x.href)) {
       applied.push(await applyProposal(p));
     }
-    proposals = proposals.filter((x) => !(x.tiny && !x.unavailable && x.action.type !== "open_page"));
+    proposals = proposals.filter((x) => !(x.tiny && !x.unavailable && !x.href));
   }
 
+  // A supportive note (with Kids Helpline) goes first, once, when the message sounds distressed.
+  if (support) parsed.reply = `${support}\n\n${parsed.reply}`.slice(0, 6000);
   return {
     ok: true,
     message: parsed.dropped ? `${parsed.dropped} request${parsed.dropped === 1 ? " wasn't" : "s weren't"} allowed and ${parsed.dropped === 1 ? "was" : "were"} skipped.` : "",
