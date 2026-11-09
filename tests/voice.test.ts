@@ -39,7 +39,8 @@ test("everything else goes to the AI", () => {
 test("subject words", () => {
   assert.equal(matchSubjectWords("maths advanced homework"), "Mathematics Advanced");
   assert.equal(matchSubjectWords("Mathematics Extension 1"), "Mathematics Extension 1");
-  assert.equal(matchSubjectWords("history"), null);
+  assert.equal(matchSubjectWords("history"), "History"); // a Years 7–10 subject
+  assert.equal(matchSubjectWords("basket weaving"), null);
 });
 
 import fs from "node:fs";

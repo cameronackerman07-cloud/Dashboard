@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { DueSoon } from "@/components/DueSoon";
 import { Greeting } from "@/components/Greeting";
+import { getSchool } from "@/lib/my-subjects";
 import { HscCountdown, type CountdownDate } from "@/components/HscCountdown";
 import { timetableReleased } from "@/lib/hsc-dates";
 import { studySummary } from "@/lib/study-sessions";
@@ -21,6 +22,7 @@ type TodayRow = { key: string; slot: string; name: string; sub: string | null; c
 
 export default async function Home() {
   const profile = await getProfile();
+  const school = await getSchool();
   // New Canvas work first, so "Due soon" includes it (at most every 30 minutes).
   await syncCanvas({ maxAgeMs: AUTO_SYNC_MS });
   const supabase = await createClient();
@@ -226,13 +228,16 @@ export default async function Home() {
           <DueSoon tasks={dueSoon} />
         </section>
 
-        <HscCountdown
-          serverNow={now}
-          firstExam={firstExam}
-          dates={keyDates.filter((d) => d.pinned || d.kind !== "term").slice(0, 4)}
-          totalStudy={hoursText(study.total)}
-          released={timetableReleased(now)}
-        />
+        {/* The HSC countdown is for Years 11–12; Years 7–10 skip it. */}
+        {(school.year ?? 12) >= 11 ? (
+          <HscCountdown
+            serverNow={now}
+            firstExam={firstExam}
+            dates={keyDates.filter((d) => d.pinned || d.kind !== "term").slice(0, 4)}
+            totalStudy={hoursText(study.total)}
+            released={timetableReleased(now)}
+          />
+        ) : null}
 
         <section className="card" aria-label="Quick actions">
           <h2 className="card-title">Quick actions</h2>

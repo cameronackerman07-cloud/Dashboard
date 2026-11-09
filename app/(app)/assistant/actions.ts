@@ -9,13 +9,14 @@ import { applyAddBlock, applyAddNote, applyAddTodo, applyCreateFlashcards, apply
 import { ACTION_GUIDE, INSTANT_ACTIONS, parseAction, parseAssistantReply, TINY_ACTIONS, type AssistantAction, type AssistantMode } from "@/lib/assistant/schema";
 import { finishSession, pauseSession, startSession, studySummary } from "@/lib/study-sessions";
 import { hoursSpoken } from "@/lib/study-time";
-import { advise, CLOSING, draftFrom } from "@/lib/life/advisor";
+import { advise, CLOSING, draftFrom, VERDICT_TEXT } from "@/lib/life/advisor";
 import type { LifeCategory } from "@/lib/life";
 import { soundsDistressed, SUPPORT_MESSAGE } from "@/lib/life/support";
 import { buildPlan, gatherFacts, savePlan } from "@/lib/budget-plan";
 import { isBudgetPlan, normalizePlan, planTotals, type BudgetPlan } from "@/lib/budget-plan-core";
 import { formatCents } from "@/lib/money";
-import { ALL_ITEMS, COURSES } from "@/lib/nav";
+import { ALL_ITEMS } from "@/lib/nav";
+import { getMySubjects, getSchool } from "@/lib/my-subjects";
 import { draftPlan, type PlanDraft } from "@/lib/planner/generate";
 import { createClient, currentUserId } from "@/lib/supabase/server";
 import { addDays, dayKey, formatDayKeyLong, mondayOf, sydneyInstant, timeKey } from "@/lib/time";
@@ -121,7 +122,7 @@ async function prepare(userId: string, action: AssistantAction, agents: { id: st
       // A draft that isn't saved: evaluated against the real week, then the student decides on My life.
       const start = sydneyInstant(action.day, action.start);
       const advice = await advise(await createClient(), userId, draftFrom({ category: action.category as LifeCategory, start, end: start + action.minutes * 60_000, travelBefore: 20, travelAfter: 20, want: action.want }));
-      const verdict = { go: "Go", "go but shorter": "Go, but make it shorter", swap: "Go, and swap something", skip: "Probably skip this one" }[advice.verdict];
+      const verdict = VERDICT_TEXT[advice.verdict].replace(/\.$/, "");
       const alt = advice.alternatives[0] ? ` Option: ${advice.alternatives[0].label}.` : "";
       return { key, action, tiny: true, href: "/life", summary: `${verdict}. ${advice.reasons.join(" ")}${alt} ${CLOSING} Open My life to add it and plan around your choice.` };
     }
@@ -258,14 +259,15 @@ export async function askAssistant(message: string, history: Turn[], model?: str
     .map((t) => ({ role: t.role, content: sanitizeForAI(t.text.slice(0, 2000)) }));
 
   const style = await getProfileContext(supabase, userId);
-  const system = `You are The BRIAN, the helper inside a NSW Year 11/12 student's study dashboard. Today is ${formatDayKeyLong(today)} (${today}), ${timeKey(now)} Sydney time.
+  const school = await getSchool();
+  const system = `You are The BRIAN, the helper inside a NSW high school student's study dashboard${school.year ? ` (they are in Year ${school.year})` : ""}. Today is ${formatDayKeyLong(today)} (${today}), ${timeKey(now)} Sydney time.
 Pick ONE mode from the student's message:
 - "tutor": they want to learn or solve something. Give hints and guiding questions first. Only give a full worked solution if they clearly ask for it.
 - "chat": anything else to talk about.
 - "action": they asked you to DO something in the site. Only use actions they asked for.
 ${ACTION_GUIDE}
-Their subjects: ${COURSES.join(", ")}. Agents: ${agentList.map((a) => a.name).join(", ") || "none"}. Habits: ${((habits ?? []) as { name: string }[]).map((h) => h.name).join(", ") || "none"}. Pages: ${PAGES.join(", ")}.
-For a study plan just use create_study_plan; never work out times yourself. For "should I go to X" questions use should_i_go: never decide for them, and never lecture about parties or friends.
+Their subjects: ${(await getMySubjects()).join(", ")}. Agents: ${agentList.map((a) => a.name).join(", ") || "none"}. Habits: ${((habits ?? []) as { name: string }[]).map((h) => h.name).join(", ") || "none"}. Pages: ${PAGES.join(", ")}.
+For a study plan just use create_study_plan; never work out times yourself. For "should I go to X" questions use should_i_go: it gives a clear recommendation (go, go but shorter, move something, or skip) and they make the final call. Never lecture about parties or friends.
 If they sound overwhelmed, stressed or unsafe, be kind and supportive first, suggest talking to a trusted adult, and give no medical advice. Never ask for or repeat passwords, keys, tokens or phone numbers.
 Reply with ONLY JSON: {"mode": "tutor"|"chat"|"action", "reply": string (plain text, short paragraphs), "actions": [ ... ]}. "actions" is [] unless mode is "action".${opts?.voice ? "\nThis came from voice and your reply will be read aloud: reply in one to three short spoken sentences, no markdown or lists, and say numbers naturally." : ""}${style ? `\n${style} Use this only to tune your tone.` : ""}`;
 

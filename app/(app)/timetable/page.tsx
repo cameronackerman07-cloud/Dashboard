@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
 import { getCalendarConnections, loadEvents } from "@/lib/calendar";
-import { COURSES } from "@/lib/nav";
+import { getMySubjects } from "@/lib/my-subjects";
 import { createClient } from "@/lib/supabase/server";
 import { formatShortDate, formatTime, startOfDay, weekday } from "@/lib/time";
 import { TimetableClient, type ClassRow, type LinkedDay } from "./TimetableClient";
@@ -62,7 +62,7 @@ export default async function TimetablePage() {
       />
       <TimetableClient
         classes={classes}
-        courses={COURSES}
+        courses={await getMySubjects()}
         linked={hasLinked ? linked : null}
         linkError={error}
         connected={connections.length > 0}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
 import { hscSentence } from "@/lib/hsc-dates";
-import { COURSES } from "@/lib/nav";
+import { getMySubjects } from "@/lib/my-subjects";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, dayKey, formatDayKey, isDayKey, mondayOf, sydneyInstant } from "@/lib/time";
 import { PlannerClient, type Block } from "./PlannerClient";
@@ -81,7 +81,7 @@ export default async function PlannerPage({ searchParams }: Props) {
       <p className="lede" style={{ marginTop: -8 }}>
         Repeating blocks happen at the same time every week, on top of the plan above.
       </p>
-      <PlannerClient blocks={(repeating ?? []) as Block[]} courses={COURSES} />
+      <PlannerClient blocks={(repeating ?? []) as Block[]} courses={await getMySubjects()} />
     </main>
   );
 }

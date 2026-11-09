@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { markKey, recordUsage, resolveKeys, type KeySet } from "@/lib/ai-keys";
-import { COURSES } from "@/lib/nav";
+import { getMySubjects } from "@/lib/my-subjects";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
 import { currentUserId } from "@/lib/supabase/server";
 import { transcribe } from "@/lib/voice";
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 // Spelling hints only: course names and command words. Nothing personal.
-const VOCAB = `HSC, NESA, ATAR, ${COURSES.join(", ")}, The BRIAN, flashcards, study timer, study planner, to-do, Pomodoro.`;
+const vocab = (subjects: string[]) => `HSC, NESA, ATAR, ${subjects.join(", ")}, The BRIAN, flashcards, study timer, study planner, to-do, Pomodoro.`;
 
 export async function POST(request: Request) {
   const userId = await currentUserId();
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   let keys: KeySet | null = null;
   const res = await transcribe(audio instanceof Blob ? audio : null, Number(form.get("seconds") ?? 0), {
     mock: process.env.AI_MOCK === "1",
-    vocab: VOCAB,
+    vocab: vocab(await getMySubjects()),
     fetch,
     clipsLastHour: async () => {
       if (!db) return 0;

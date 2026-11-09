@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { daysUntil, HSC_DATES } from "@/lib/hsc-dates";
 import { hasUsableKey } from "@/lib/ai-keys";
 import { ATAR_LINKS, coachSettings, courseProgress, STUDY_METHODS, type Assessment } from "@/lib/coach";
-import { COURSES } from "@/lib/nav";
+import { getMySubjects } from "@/lib/my-subjects";
 import { createClient, currentUserId } from "@/lib/supabase/server";
 import { dayKey } from "@/lib/time";
 import { CoachClient, type AssessmentRow, type GuideRow } from "./CoachClient";
@@ -54,7 +54,7 @@ export default async function CoachPage() {
       </section>
       {!aiReady ? <AiNotice /> : null}
       <CoachClient
-        courses={COURSES}
+        courses={await getMySubjects()}
         assessments={list}
         progress={courseProgress(list as Assessment[])}
         guides={(guides ?? []) as GuideRow[]}

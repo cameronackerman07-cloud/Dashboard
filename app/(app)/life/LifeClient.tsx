@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ReplyLine, useAction } from "@/components/useAction";
 import { CATEGORIES, type LifeCategory, type LifeItem, type LifePrefs } from "@/lib/life";
 import type { Balance } from "@/lib/planner/balance";
-import type { Option } from "@/lib/life/evaluate";
+import { VERDICT_TEXT, type Option } from "@/lib/life/evaluate";
 import { formatTime, timeKey, dayKey } from "@/lib/time";
 import { undoAssistantAction } from "../assistant/actions";
 import { applyDecision, checkLife, deleteLifeItem, previewDecision, quickAddLife, resetLifePrefs, saveLifeItem, saveLifePrefs, setLifeStatus, type CheckReply, type DraftFields } from "./actions";
@@ -261,7 +261,6 @@ function ShouldIGo({ today, onCheck, pending }: { today: string; onCheck: (i: Pa
   );
 }
 
-const VERDICT_TEXT: Record<string, string> = { go: "Go", "go but shorter": "Go, but make it shorter", swap: "Go, and swap something", skip: "Probably skip this one" };
 
 function AdvicePanel({ reply, onClose }: { reply: CheckReply; onClose: () => void }) {
   const router = useRouter();

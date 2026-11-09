@@ -80,9 +80,24 @@ export async function startSession(
     .single();
   if (error || !data) {
     if (error?.code === "23505") return { ok: false, message: "A timer is already going. Finish or discard it first." };
-    return { ok: false, message: "Couldn't start the timer." };
+    console.error(`Timer start failed: ${error?.code ?? "no row"} ${error?.message ?? ""}`.slice(0, 300));
+    return { ok: false, message: `Couldn't start the timer. ${dbReason(error)}` };
   }
   return { ok: true, message: `${minutes}-minute ${(data as StudySession).subject} timer started.`, session: data as StudySession };
+}
+
+// A plain-English reason for a failed database write, so a setup problem says
+// what to fix instead of a vague "couldn't start". Never includes user data.
+export function dbReason(error: { code?: string; message?: string } | null): string {
+  const code = error?.code ?? "";
+  const msg = error?.message ?? "";
+  if (code === "42P01" || code === "PGRST205" || /does not exist|schema cache/i.test(msg))
+    return "The study timer table isn't in the database yet: run supabase/phase6.sql in the Supabase SQL Editor, then try again.";
+  if (code === "42703" || code === "PGRST204") return "The database is missing a column: run supabase/phase6.sql again.";
+  if (code === "42501") return "The database refused it (permissions): run supabase/phase6.sql again.";
+  if (code === "23503") return "Your account isn't fully set up in the database. Sign out and back in.";
+  if (code === "23514") return "One of the timer settings was out of range. Pick a different length.";
+  return code ? `(Database code ${code}.)` : "Try again in a moment.";
 }
 
 async function open(db: Db, userId: string, id?: string | null): Promise<StudySession | null> {

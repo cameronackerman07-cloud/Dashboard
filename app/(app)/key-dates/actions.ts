@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { COURSES } from "@/lib/nav";
+import { getMySubjects } from "@/lib/my-subjects";
 import { optionalSubject } from "@/lib/subjects";
 import { createClient, currentUserId } from "@/lib/supabase/server";
 import { isDayKey, isTimeKey, sydneyInstant } from "@/lib/time";
@@ -43,7 +43,7 @@ export async function saveExamDates(f: FormData): Promise<Reply> {
   if (!(await currentUserId())) return SIGNED_OUT;
   const db = await createClient();
   const rows: { title: string; starts_at: string; kind: string; course: string }[] = [];
-  for (const [i, course] of COURSES.entries()) {
+  for (const [i, course] of (await getMySubjects()).entries()) {
     const day = String(f.get(`day-${i}`) ?? "");
     const time = String(f.get(`time-${i}`) ?? "");
     if (!day) continue;

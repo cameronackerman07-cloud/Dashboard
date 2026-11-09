@@ -911,3 +911,15 @@ details > summary.btn { list-style: none; display: inline-flex; margin-bottom: 1
   .voice-panel { right: 16px; left: 16px; width: auto; bottom: calc(86px + env(safe-area-inset-bottom)); }
   .main { padding-bottom: 110px; }
 }
+
+/* Year and subjects picker (/welcome and Settings) */
+.ys { display: flex; flex-direction: column; gap: 18px; }
+.ys-group { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.ys-years, .ys-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ys-chip {
+  min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-strong);
+  background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.ys-chip.is-on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.ys-chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.auth-card-wide { max-width: 720px; width: 100%; }

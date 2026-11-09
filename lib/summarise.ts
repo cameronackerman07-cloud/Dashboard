@@ -2,7 +2,6 @@ import "server-only";
 import { aiJson, type AiResult } from "@/lib/ai";
 import { normKey } from "@/lib/flashcards";
 import { ALL_SUBJECTS, GENERAL_SUBJECT, matchSubject, modulesFor } from "@/lib/subjects";
-import { COURSES } from "@/lib/nav";
 
 // Turns the text of an upload into a summary plus flashcards, with the AI.
 // Privacy: only the upload's text goes to the model (with emails and phone
@@ -85,8 +84,8 @@ function parseChunk(value: unknown): ChunkAnswer | null {
   return { title: str(v.title, 120), subject: matchSubject(v.subject), sections, flashcards };
 }
 
-export function moduleHint(subject: string | null): string {
-  const subjects = subject ? [subject] : COURSES;
+export function moduleHint(subject: string | null, mine: string[] = []): string {
+  const subjects = subject ? [subject] : mine;
   const lines = subjects
     .map((s) => {
       const mods = modulesFor(s).map((m) => m.name);

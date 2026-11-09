@@ -1,5 +1,5 @@
-import { COURSES } from "@/lib/nav";
 import { TOPICS } from "@/lib/hsc";
+import { JUNIOR_GROUPS, STAGE4_CORE, STAGE4_ELECTIVES, STAGE5_CORE, STAGE5_ELECTIVES } from "@/lib/junior-subjects";
 
 // Every NSW Stage 6 (Year 11–12) subject, for the subject pickers on Summaries,
 // Flashcards, To-do and Notes, and for the AI to file flashcards under.
@@ -10,12 +10,14 @@ import { TOPICS } from "@/lib/hsc";
 // by Enterprise Computing, Software Engineering and Health and Movement Science.
 // Languages are listed by language: pick the language whatever the course level.
 
-export type SubjectGroup = { label: string; subjects: string[] };
+import type { SubjectGroup } from "@/lib/junior-subjects";
+export type { SubjectGroup };
 
 export const GENERAL_SUBJECT = "General / Other";
 
-const ALL_GROUPS: SubjectGroup[] = [
-  { label: "My courses", subjects: [...COURSES] },
+// Stage 6 (Years 11–12). "My courses" (the owner's old fixed list) is no longer
+// shown: everyone now picks their own subjects on /welcome and in Settings.
+export const STAGE6_GROUPS: SubjectGroup[] = [
   {
     label: "English",
     subjects: [
@@ -140,14 +142,44 @@ const ALL_GROUPS: SubjectGroup[] = [
   { label: "Other", subjects: [GENERAL_SUBJECT] },
 ];
 
-// "My courses" first; each subject appears once (a course of yours isn't
-// repeated further down).
-const mine = new Set<string>(COURSES);
-export const SUBJECT_GROUPS: SubjectGroup[] = ALL_GROUPS.map((g, i) =>
-  i === 0 ? g : { ...g, subjects: g.subjects.filter((s) => !mine.has(s)) },
-).filter((g) => g.subjects.length > 0);
+// Every subject the site knows (Years 7–12), each once. Used to check a
+// subject name before saving it.
+export const SUBJECT_GROUPS: SubjectGroup[] = [...STAGE6_GROUPS.filter((g) => g.label !== "Other"), ...JUNIOR_GROUPS, { label: "Other", subjects: [GENERAL_SUBJECT] }];
+export const ALL_SUBJECTS: string[] = [...new Set(SUBJECT_GROUPS.flatMap((g) => g.subjects))];
 
-export const ALL_SUBJECTS: string[] = SUBJECT_GROUPS.flatMap((g) => g.subjects);
+// ---------------------------------------------------------------------------
+// Year levels. The site is for high school: Years 7–12.
+// ---------------------------------------------------------------------------
+
+export const YEARS = [7, 8, 9, 10, 11, 12] as const;
+export type YearLevel = (typeof YEARS)[number];
+
+export function isYear(value: unknown): value is YearLevel {
+  return value !== null && value !== "" && YEARS.includes(Number(value) as YearLevel);
+}
+
+// The subjects everyone in that year takes (ticked for you on the picker).
+export function coreFor(year: YearLevel): string[] {
+  if (year <= 8) return STAGE4_CORE;
+  if (year <= 10) return STAGE5_CORE;
+  return []; // Years 11–12 only require English, and you pick which English.
+}
+
+// The other subjects you can choose in that year.
+export function choicesFor(year: YearLevel): SubjectGroup[] {
+  if (year <= 8) return STAGE4_ELECTIVES;
+  if (year <= 10) return STAGE5_ELECTIVES;
+  return STAGE6_GROUPS.filter((g) => g.label !== "Other");
+}
+
+export const MAX_MY_SUBJECTS = 16;
+
+// Keeps only real subjects for that year, in order, once each.
+export function cleanMySubjects(year: YearLevel, value: unknown): string[] {
+  const list = Array.isArray(value) ? value : [];
+  const allowed = new Set([...coreFor(year), ...choicesFor(year).flatMap((g) => g.subjects)]);
+  return [...new Set(list.filter((s): s is string => typeof s === "string" && allowed.has(s)))].slice(0, MAX_MY_SUBJECTS);
+}
 const BY_LOWER = new Map(ALL_SUBJECTS.map((s) => [s.toLowerCase(), s]));
 
 // The exact subject name for anything close ("physics" → "Physics"), or null.
@@ -255,7 +287,7 @@ function fromTopics(course: string): Module[] {
 
 export const SYLLABUS: Record<string, Module[]> = {
   ...OTHER_SYLLABUS,
-  ...Object.fromEntries(COURSES.map((c) => [c, fromTopics(c)])),
+  ...Object.fromEntries(Object.keys(TOPICS).map((c) => [c, fromTopics(c)])),
 };
 
 export function modulesFor(subject: string): Module[] {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
 import { countdownLabel, daysUntil, HSC_DATES, STUDENTS_ONLINE_URL } from "@/lib/hsc-dates";
-import { COURSES } from "@/lib/nav";
+import { getMySubjects } from "@/lib/my-subjects";
 import { createClient } from "@/lib/supabase/server";
 import { dayKey, formatDayKeyLong, formatTime, timeKey } from "@/lib/time";
 import { KeyDatesClient, type KeyDateRow } from "./KeyDatesClient";
@@ -44,7 +44,7 @@ export default async function KeyDatesPage() {
         </p>
       </section>
 
-      <KeyDatesClient rows={rows} courses={[...COURSES]} exams={exams} studentsOnline={STUDENTS_ONLINE_URL} />
+      <KeyDatesClient rows={rows} courses={await getMySubjects()} exams={exams} studentsOnline={STUDENTS_ONLINE_URL} />
     </main>
   );
 }

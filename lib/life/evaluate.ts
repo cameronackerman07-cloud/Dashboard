@@ -157,6 +157,14 @@ export type Verdict = "go" | "go but shorter" | "swap" | "skip";
 // Usually "go": social life, exercise and rest are real priorities. Only a real
 // conflict changes that: too little sleep before a high-stakes day, a deadline
 // that can't be saved, or a double booking with something fixed.
+// The advisor's recommendation, said plainly: it does say what it thinks.
+export const VERDICT_TEXT: Record<Verdict, string> = {
+  go: "My advice: go. Your week can handle it.",
+  "go but shorter": "My advice: go, but leave a bit earlier.",
+  swap: "My advice: go, and move one thing to make room.",
+  skip: "My advice: I'd skip this one.",
+};
+
 export function defaultVerdict(e: Evaluation, prefs: LifePrefs): Verdict {
   const minimum = Math.min(SLEEP_MINIMUM_HOURS, prefs.sleep_hours);
   const fixedClash = e.clashes.some((c) => c.fixed);

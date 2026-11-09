@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SubjectSelect } from "@/components/SubjectSelect";
+import { useMySubjects } from "@/components/MySubjects";
 import { ReplyLine, useAction } from "@/components/useAction";
 import { hoursText, SESSION_KINDS, type StudySession } from "@/lib/study-time";
 import { addDays, dayKey, formatDayKey, formatTime } from "@/lib/time";
@@ -9,6 +10,7 @@ import { addManualSession, deleteSession, editSession, saveStudySettings } from 
 
 export function ManualEntry({ today }: { today: string }) {
   const { pending, reply, run } = useAction();
+  const { first } = useMySubjects();
   const [key, setKey] = useState(0);
   return (
     <section className="card" aria-label="Add time you forgot to time">
@@ -48,7 +50,7 @@ export function ManualEntry({ today }: { today: string }) {
         </label>
         <label className="field">
           <span className="field-label">Subject</span>
-          <SubjectSelect emptyLabel={null} defaultValue="Physics" />
+          <SubjectSelect emptyLabel={null} defaultValue={first} />
         </label>
         <label className="field">
           <span className="field-label">Topic</span>

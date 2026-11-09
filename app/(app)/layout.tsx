@@ -7,6 +7,8 @@ import { activeSession } from "@/lib/study-sessions";
 import { ensureDefaultAgents } from "@/lib/agents/defaults";
 import { initials } from "@/lib/auth";
 import { getProfile } from "@/lib/profile";
+import { MySubjectsProvider } from "@/components/MySubjects";
+import { getSchool } from "@/lib/my-subjects";
 import { supabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,6 +21,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const profile = await getProfile();
   if (!profile) redirect("/login");
 
+  // New accounts pick their year and subjects first.
+  const school = await getSchool();
+  if (!school.ready && !school.missing) redirect("/welcome");
+
   // Badge the Assignments nav item with the number of tasks still to do.
   const supabase = await createClient();
   const [{ count }, { count: unread }, , timer] = await Promise.all([
@@ -29,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
 
   return (
+    <MySubjectsProvider value={{ year: school.year, subjects: school.subjects }}>
     <div className="shell">
       <Sidebar
         badges={{ assignments: count ?? 0, inbox: unread ?? 0, ...(timer ? { timer: "ON" } : {}) }}
@@ -41,6 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <VoiceButton />
       <AppBadge count={unread ?? 0} />
     </div>
+    </MySubjectsProvider>
   );
 }
 

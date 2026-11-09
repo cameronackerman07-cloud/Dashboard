@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { SubjectSelect } from "@/components/SubjectSelect";
+import { useMySubjects } from "@/components/MySubjects";
 import { clock, elapsedSeconds, nudges, PRESETS, remainingSeconds, SESSION_KINDS, type StudySession } from "@/lib/study-time";
 import { modulesFor } from "@/lib/subjects";
 import { weekday } from "@/lib/time";
@@ -69,6 +70,7 @@ export function TimerClient({
   linkBlock: string | null;
   todaySeconds: number;
 }) {
+  const { first } = useMySubjects();
   const router = useRouter();
   const [session, setSession] = useState<StudySession | null>(initial);
   const [offset, setOffset] = useState(0); // server clock minus this device's clock
@@ -79,7 +81,7 @@ export function TimerClient({
   const [custom, setCustom] = useState("");
   const preset = blocks.find((b) => b.id === linkBlock) ?? null;
   const [blockId, setBlockId] = useState<string>(preset?.id ?? "");
-  const [subject, setSubject] = useState(preset?.subject ?? "Physics");
+  const [subject, setSubject] = useState(preset?.subject ?? first);
   const [topic, setTopic] = useState(preset?.topic ?? "");
   const [kind, setKind] = useState("focus");
   const [pomodoro, setPomodoro] = useState(settings.pomodoro);

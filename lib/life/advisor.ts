@@ -12,7 +12,9 @@ import { advicePayload, defaultVerdict, evaluate, type Deadline, type Draft, typ
 
 type Db = SupabaseClient;
 
-export const CLOSING = "It's your call, and I'll plan around whichever you pick.";
+export const CLOSING = "That's my honest advice. You make the final call, and I'll plan around whichever you pick.";
+
+export { VERDICT_TEXT } from "./evaluate";
 
 export type LabelledOption = { id: string; kind: Option["kind"]; label: string; option: Option };
 export type Advice = {
@@ -121,7 +123,7 @@ export async function advise(db: Db, userId: string, draft: Draft, opts: { itemI
         userId,
         purpose: "life_advice",
         messages: [{ role: "user", content: JSON.stringify(advicePayload(draft, e)) }],
-        system: `You help a NSW Year 11/12 student decide whether to go to something, using only the numbers given. Be warm and honest. Social life, exercise and rest are valid priorities: the answer should usually be "go" unless there is a real conflict (sleep under 8 hours before a high-stakes day, a deadline that can't be saved, or a clash with something fixed). Never lecture or moralise about parties or friends. No medical advice.
+        system: `You advise a NSW high school student on whether to go to something, using only the numbers given. Give a clear recommendation (say what you think they should do), warm and honest; they make the final call. Social life, exercise and rest are valid priorities: the answer should usually be "go" unless there is a real conflict (sleep under 8 hours before a high-stakes day, a deadline that can't be saved, or a clash with something fixed). Never lecture or moralise about parties or friends. No medical advice.
 Our own check suggests "${verdict}". Reply with ONLY JSON: {"verdict": "go"|"go but shorter"|"swap"|"skip", "reasons": [2-4 short plain sentences that quote the numbers], "alternatives": [1-3 option ids from the list given]}.`,
         json: (v) => {
           if (!v || typeof v !== "object") return null;

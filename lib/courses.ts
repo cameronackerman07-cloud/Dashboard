@@ -1,4 +1,5 @@
 import { COURSES } from "@/lib/nav";
+import { matchSubject } from "@/lib/subjects";
 
 // Turns a school's own class name ("12 ENG STUDIES 2027", "11MEX1", "Physics 12P2")
 // into one of the dashboard's COURSES, or null if it isn't one of them.
@@ -17,7 +18,7 @@ const RULES: { course: string; test: RegExp }[] = [
 export function matchCourse(name: string): string | null {
   const text = name.trim();
   if (!text) return null;
-  const exact = COURSES.find((c) => c.toLowerCase() === text.toLowerCase());
+  const exact = matchSubject(text);
   if (exact) return exact;
   return RULES.find((r) => r.test.test(text))?.course ?? null;
 }

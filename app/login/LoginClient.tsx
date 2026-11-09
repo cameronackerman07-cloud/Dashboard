@@ -20,7 +20,7 @@ async function post(path: string, body: Record<string, string>): Promise<{ ok: b
   }
 }
 
-export function LoginClient({ connected, needsInvite }: { connected: boolean; needsInvite: boolean }) {
+export function LoginClient({ connected }: { connected: boolean }) {
   const [mode, setMode] = useState<Mode>("signin");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -61,10 +61,8 @@ export function LoginClient({ connected, needsInvite }: { connected: boolean; ne
       mode === "signin"
         ? await post("/api/auth/signin", { email: field("email"), password: field("password") })
         : await post("/api/auth/signup", {
-            displayName: field("displayName"),
             email: field("email"),
             password: field("password"),
-            inviteCode: field("inviteCode"),
           });
 
     if (!res.ok) {
@@ -79,7 +77,7 @@ export function LoginClient({ connected, needsInvite }: { connected: boolean; ne
       return;
     }
     // A full page load, so every page sees the new session cookies.
-    window.location.assign("/");
+    window.location.assign(mode === "signup" ? "/welcome" : "/");
   }
 
   if (!connected) {
@@ -148,25 +146,11 @@ export function LoginClient({ connected, needsInvite }: { connected: boolean; ne
               {mode === "signin"
                 ? "Sign in with your email and password."
                 : mode === "signup"
-                  ? "Everything you add stays private to your account."
+                  ? "Just an email and a password. Next you\u2019ll pick your year and subjects."
                   : "We'll email you a one-time sign-in link. Then set a new password in Settings."}
             </p>
 
             <form className="auth-form" onSubmit={onSubmit} key={mode}>
-              {mode === "signup" ? (
-                <label className="field">
-                  <span className="field-label">Your name</span>
-                  <input
-                    className="input"
-                    name="displayName"
-                    autoComplete="given-name"
-                    required
-                    maxLength={40}
-                    placeholder="What should the dashboard call you?"
-                  />
-                </label>
-              ) : null}
-
               <label className="field">
                 <span className="field-label">Email</span>
                 <input
@@ -194,21 +178,6 @@ export function LoginClient({ connected, needsInvite }: { connected: boolean; ne
                     maxLength={72}
                   />
                   {mode === "signup" ? <span className="field-help">At least 8 characters.</span> : null}
-                </label>
-              ) : null}
-
-              {mode === "signup" && needsInvite ? (
-                <label className="field">
-                  <span className="field-label">Invite code</span>
-                  <input
-                    className="input"
-                    name="inviteCode"
-                    autoComplete="off"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    required
-                  />
-                  <span className="field-help">Ask whoever sent you the link.</span>
                 </label>
               ) : null}
 

@@ -3,7 +3,7 @@ import { aiJson } from "@/lib/ai";
 import { hasUsableKey } from "@/lib/ai-keys";
 import { sanitizeForAI } from "@/lib/agents/sanitize";
 import { loadEvents } from "@/lib/calendar";
-import { COURSES } from "@/lib/nav";
+import { getMySubjects } from "@/lib/my-subjects";
 import { googleEvents } from "@/lib/sources/google";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, dayKey, formatDayKey, sydneyInstant, timeKey, weekdayOfKey } from "@/lib/time";
@@ -88,7 +88,8 @@ export async function draftPlan(userId: string, weekStart: string, opts: { model
   const weakTopics = [...weak.values()].filter((w) => w.score > 0).sort((a, b) => b.score - a.score).slice(0, 6);
   for (const w of weakTopics) priorities.push({ subject: w.subject, reason: `Weak flashcard topic: ${w.topic}` });
 
-  const subjects = [...new Set([...COURSES, ...priorities.map((p) => p.subject)])];
+  const mine = await getMySubjects();
+  const subjects = [...new Set([...mine, ...priorities.map((p) => p.subject)])];
   const windowText = weekDays
     .map((d) => `${d} (${formatDayKey(d)}): ${windows.filter((w) => w.day === d).map((w) => `${timeKey(w.start)}-${timeKey(w.end)}`).join(", ") || "no free time"}`)
     .join("\n");
@@ -133,7 +134,7 @@ export async function draftPlan(userId: string, weekStart: string, opts: { model
 
   // No AI (or it failed): a simple plan in code.
   if (!proposed) {
-    const order = priorities.length ? [...new Set(priorities.map((p) => p.subject))] : COURSES;
+    const order = priorities.length ? [...new Set(priorities.map((p) => p.subject))] : mine;
     proposed = [];
     let i = 0;
     for (const w of windows) {

@@ -6,7 +6,7 @@ import { hasUsableKey } from "@/lib/ai-keys";
 import { sanitizeForAI } from "@/lib/agents/sanitize";
 import { normKey } from "@/lib/flashcards";
 import { pastPaperLinks } from "@/lib/hsc";
-import { COURSES } from "@/lib/nav";
+import { getMySubjects } from "@/lib/my-subjects";
 import { createClient, currentUserId } from "@/lib/supabase/server";
 import { isDayKey } from "@/lib/time";
 import { isUuid, optionalText, SAVE_FAILED, SIGNED_OUT, text, type Reply } from "@/lib/validate";
@@ -75,7 +75,7 @@ export async function saveCoachSettings(form: FormData): Promise<Reply> {
   const atar = num(form.get("target_atar"), 30, 99.95);
   if (atar == null || Number.isNaN(atar)) return { ok: false, message: "Your target ATAR is a number between 30 and 99.95." };
   const targets: Record<string, number> = {};
-  for (const c of COURSES) {
+  for (const c of await getMySubjects()) {
     const v = num(form.get(`target:${c}`), 1, 100);
     if (Number.isNaN(v)) return { ok: false, message: `The target for ${c} should be a mark out of 100.` };
     if (v != null) targets[c] = v;
@@ -124,7 +124,7 @@ function parseGuide(v: unknown): Guide | null {
 export async function makeGuide(course: string, topic: string, model?: string): Promise<Reply> {
   const c = text(course, 80);
   const t = text(topic, 120);
-  if (!COURSES.includes(c) || !t) return { ok: false, message: "Pick one of your courses and type a topic." };
+  if (!(await getMySubjects()).includes(c) || !t) return { ok: false, message: "Pick one of your courses and type a topic." };
   const userId = await currentUserId();
   if (!userId) return SIGNED_OUT;
   if (!(await hasUsableKey(userId))) return { ok: false, message: "Add a free AI key in Settings → AI keys to make topic guides." };

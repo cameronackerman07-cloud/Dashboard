@@ -7,7 +7,7 @@ import { SubjectSelect } from "@/components/SubjectSelect";
 import { ReplyLine, useAction } from "@/components/useAction";
 import type { AiModelOption } from "@/lib/ai";
 import { GENERAL, intervalLabel, nextReview, type Rating } from "@/lib/flashcards";
-import { COURSES } from "@/lib/nav";
+import { useMySubjects } from "@/components/MySubjects";
 import {
   checkDuplicatesNow,
   createCard,
@@ -83,6 +83,7 @@ type Props = {
 
 export function FlashcardsClient({ cards: initial, archived, now, openSubject, syllabus, models, aiReady }: Props) {
   const [cards, setCards] = useState(initial);
+  const { subjects: mine } = useMySubjects();
   const [session, setSession] = useState<Session | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [listing, setListing] = useState<Group | null>(openSubject ? { subject: openSubject } : null);
@@ -105,9 +106,9 @@ export function FlashcardsClient({ cards: initial, archived, now, openSubject, s
       subjects.set(c.subject, mods);
     }
     // Your courses first, then everything else alphabetically.
-    const rank = (s: string) => (COURSES.includes(s) ? COURSES.indexOf(s) : 100);
+    const rank = (s: string) => (mine.includes(s) ? mine.indexOf(s) : 100);
     return [...subjects.entries()].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b));
-  }, [cards]);
+  }, [cards, mine]);
 
   function start(label: string, ids: string[]) {
     if (ids.length === 0) {
@@ -355,7 +356,7 @@ export function FlashcardsClient({ cards: initial, archived, now, openSubject, s
       <AddCard
         allCards={cards}
         syllabus={syllabus}
-        defaultSubject={listing?.subject ?? openSubject ?? COURSES[0]}
+        defaultSubject={listing?.subject ?? openSubject ?? (mine[0] ?? "General / Other")}
         onAdded={(card) => setCards((all) => [card, ...all])}
       />
 

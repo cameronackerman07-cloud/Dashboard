@@ -1,5 +1,4 @@
 import "server-only";
-import { createHash, timingSafeEqual } from "node:crypto";
 
 // Shared checks for the sign-in and sign-up routes.
 
@@ -15,21 +14,6 @@ export function cleanEmail(value: unknown): string | null {
 
 export function cleanName(value: unknown): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, MAX_NAME) : "";
-}
-
-// True when no INVITE_CODE is set, or the code matches. Compared in constant
-// time so the code can't be guessed a letter at a time.
-export function inviteOk(value: unknown): boolean {
-  const expected = process.env.INVITE_CODE?.trim();
-  if (!expected) return true;
-  const given = typeof value === "string" ? value.trim() : "";
-  const a = createHash("sha256").update(given.toLowerCase()).digest();
-  const b = createHash("sha256").update(expected.toLowerCase()).digest();
-  return timingSafeEqual(a, b);
-}
-
-export function inviteRequired(): boolean {
-  return !!process.env.INVITE_CODE?.trim();
 }
 
 // Initials for the sidebar avatar: "Cameron Ackerman" → "CA", "sam" → "S".

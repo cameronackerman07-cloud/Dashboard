@@ -49,7 +49,6 @@ In **Vercel → your project → Settings → Environment Variables**, add:
 | `SUPABASE_PUBLISHABLE_KEY` | the publishable (anon) key from step 4 |
 | `SUPABASE_SERVICE_ROLE_KEY` | the service_role key from step 4 |
 | `TOKEN_ENCRYPTION_KEY` | the key I gave you in chat (keep it secret) |
-| `INVITE_CODE` | a code you choose and give to friends (e.g. three random words) |
 | `CRON_SECRET` | a long random string: run `openssl rand -hex 32` in Terminal and paste the result |
 
 Apply them to **Production, Preview and Development**, then **redeploy** (Deployments → ⋯ → Redeploy).

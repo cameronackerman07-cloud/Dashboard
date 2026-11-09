@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { AiNotice } from "@/components/AiNotice";
 import { PageHeader } from "@/components/PageHeader";
-import { COURSES } from "@/lib/nav";
+import { getMySubjects } from "@/lib/my-subjects";
 import { aiReadyFor, availableModels } from "@/lib/ai";
 import { currentUserId } from "@/lib/supabase/server";
 import { PracticeClient } from "./PracticeClient";
@@ -21,7 +21,7 @@ export default async function HscPracticePage() {
         title="HSC practice"
         lede="Generate HSC-style questions by subject and topic, type or draw your working, and submit it for marking, with feedback and a worked solution. Links to the real past papers below."
       />
-      {enabled ? <PracticeClient courses={COURSES} models={await availableModels(userId)} /> : <AiNotice />}
+      {enabled ? <PracticeClient courses={await getMySubjects()} models={await availableModels(userId)} /> : <AiNotice />}
     </main>
   );
 }

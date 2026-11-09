@@ -14,6 +14,8 @@ import { getCalendarConnections, IMPORT_SOURCE } from "@/lib/calendar";
 import { getCanvasStatus } from "@/lib/canvas";
 import { isOwner } from "@/lib/ai-keys";
 import { getProfile } from "@/lib/profile";
+import { getSchool } from "@/lib/my-subjects";
+import { YearSubjects } from "@/components/YearSubjects";
 import { createClient } from "@/lib/supabase/server";
 import { formatShortDate } from "@/lib/time";
 
@@ -88,6 +90,8 @@ export default async function SettingsPage({ searchParams }: Props) {
 
       {profile ? <AccountCard displayName={profile.displayName} email={profile.email} /> : null}
 
+      {profile ? <SchoolCard /> : null}
+
       {profile ? <WeekSettings payWeekStart={(week.data?.pay_week_start as number) ?? 3} town={(week.data?.region as string) ?? ""} /> : null}
 
       <CalendarConnect
@@ -154,5 +158,20 @@ export default async function SettingsPage({ searchParams }: Props) {
       </section>
       ) : null}
     </main>
+  );
+}
+
+// Your year and subjects: every subject list, the planner and the AI use these.
+async function SchoolCard() {
+  const school = await getSchool();
+  return (
+    <section className="card" aria-label="Year and subjects" id="subjects">
+      <h2 className="card-title">Year and subjects</h2>
+      {school.missing ? (
+        <p className="card-meta">Run supabase/phase7.sql in the Supabase SQL Editor to switch this on.</p>
+      ) : (
+        <YearSubjects year={school.year} subjects={school.subjects} />
+      )}
+    </section>
   );
 }

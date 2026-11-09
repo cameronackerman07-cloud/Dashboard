@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Icon } from "@/components/Icon";
 import { AUTO_SYNC_MS, syncCanvas } from "@/lib/canvas";
-import { COURSES } from "@/lib/nav";
+import { getMySubjects } from "@/lib/my-subjects";
 import { createClient } from "@/lib/supabase/server";
 import { AssignmentsClient, type Task } from "./AssignmentsClient";
 
@@ -50,7 +50,7 @@ export default async function AssignmentsPage() {
         </p>
       ) : null}
 
-      <AssignmentsClient tasks={tasks} courses={COURSES} />
+      <AssignmentsClient tasks={tasks} courses={await getMySubjects()} />
     </main>
   );
 }
