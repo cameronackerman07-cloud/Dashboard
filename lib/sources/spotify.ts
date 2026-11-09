@@ -66,7 +66,7 @@ export async function control(token: string, action: "play" | "pause" | "next"):
   const [method, path] = map[action];
   const res = await fetch(`https://api.spotify.com/v1/me/player/${path}`, { method, headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) });
   if (res.ok || res.status === 204) return { ok: true };
-  if (res.status === 403) return { ok: false, message: "Play controls need Spotify Premium." };
+  if (res.status === 403) return { ok: false, message: "Spotify said no. Play controls need Premium, and the app owner must have added your Spotify email." };
   if (res.status === 404) return { ok: false, message: "Open Spotify on a device first." };
   return { ok: false, message: "Spotify didn't respond. Try again." };
 }

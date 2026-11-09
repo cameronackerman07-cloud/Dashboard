@@ -42,6 +42,31 @@ More precise alternative: in Supabase enable the `pg_cron` and `pg_net` extensio
 `select net.http_post(url := '<SITE_URL>/api/agents/tick', headers := jsonb_build_object('Authorization', 'Bearer <AGENT_SECRET>'));`
 every 15 minutes (`*/15 * * * *`). Keep the secret out of this repo.
 
+### Study timer alerts on time (optional)
+
+The 30-minute tick also sends "Time's up" pushes for study timers, but that can be up to 30+ minutes
+late. For alerts on the minute, even when the app is closed, run this once in Supabase → SQL Editor
+(it enables `pg_cron` and `pg_net`, then calls `/api/timer/sweep` every minute). Replace the two
+placeholders; the secret lives only in your Supabase database, never in this repo:
+
+```sql
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+select cron.schedule(
+  'dashboard-timer-sweep',
+  '* * * * *',
+  $$ select net.http_post(
+       url := 'https://YOUR-SITE.vercel.app/api/timer/sweep',
+       headers := jsonb_build_object('Authorization', 'Bearer YOUR-AGENT-SECRET')
+     ); $$
+);
+```
+
+To stop it: `select cron.unschedule('dashboard-timer-sweep');`. If you skip this, timers still work and
+count correctly (they're worked out from timestamps), and a forgotten timer is still closed at its
+planned end; only the "Time's up" notification may arrive late when the app is closed. While the
+timer page is open it chimes on time by itself.
+
 Scheduled agents only read your data and write findings and reports; they never send messages,
 apply for anything, buy anything or change your calendar.
 
@@ -49,7 +74,14 @@ apply for anything, buy anything or change your calendar.
 
 `npm test` runs the unit tests in `tests/` (schedules and daylight saving, the AI sanitiser,
 encryption, cleaning-hours weeks, clashes, the planner, budgets, coach maths, money-idea scoring,
-About me filters).
+About me filters, the study timer, the HSC countdown, PowerPoint reading with zip-bomb and XXE cases,
+My life sleep and balance maths, and the voice fast paths).
+
+## Phase 6 setup
+
+Run `supabase/phase6.sql` after `schema.sql` and `agents.sql`. It creates the timer, key dates, My life
+and voice tables, and the private Storage bucket `uploads` with its policies. Voice needs each person's
+own free Groq key (Settings → AI keys).
 
 ## For Claude Code
 

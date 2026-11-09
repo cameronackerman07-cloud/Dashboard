@@ -25,7 +25,10 @@ export async function GET(request: Request) {
     signal: AbortSignal.timeout(10_000),
   });
   const body = (await res.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string };
-  if (!res.ok || !body.refresh_token) return back("failed");
+  if (!res.ok || !body.refresh_token) return back(res.status === 403 ? "not-allowed" : "failed");
+  // Development-mode apps only work for people the owner added by email: Spotify answers 403 for anyone else.
+  const me = body.access_token ? await fetch("https://api.spotify.com/v1/me", { headers: { Authorization: `Bearer ${body.access_token}` }, signal: AbortSignal.timeout(6000), cache: "no-store" }).catch(() => null) : null;
+  if (me && me.status === 403) return back("not-allowed");
   await saveConnection(userId, { provider: "spotify", label: "Spotify", accountHint: null, scopes: SPOTIFY_SCOPES, refreshToken: body.refresh_token });
   const premium = body.access_token ? await isPremium(body.access_token) : null;
   const [conn] = await getConnections(userId, "spotify");

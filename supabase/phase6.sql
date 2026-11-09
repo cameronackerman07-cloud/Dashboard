@@ -222,3 +222,6 @@ create index if not exists voice_clips_created_idx on public.voice_clips (user_i
 
 alter table public.user_settings add column if not exists speak_replies boolean;
 alter table public.user_settings add column if not exists speech_rate   numeric(3,2) not null default 1.0;
+
+-- The helper was only needed while this file ran.
+drop function if exists public.dash_own_table(text);

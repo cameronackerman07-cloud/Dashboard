@@ -34,8 +34,9 @@ Read this before every task. Keep it up to date when decisions change.
   When you build a real page, create `app/(app)/<slug>/page.tsx` AND set `built: true` on that item
   in `lib/nav.ts` (the placeholder skips built slugs in `generateStaticParams`, so they don't clash).
 - Built pages so far: `assignments` (due-date tracker), `timetable`, `notes` (+ `notes/[id]` editor),
-  `planner`, `hsc-practice`, `tutor`, `summaries`, `flashcards`, `calendar`, `todo`, `shifts`, `pay`,
-  `habits`, `inbox`, `ai-agents`, `assistant`, `coach`, `money-ideas`, `profile` (About me). Each has `page.tsx` (server, fetches data), usually a `*Client.tsx` (interactivity,
+  `planner`, `hsc-practice`, `tutor`, `summaries` (+ `summaries/[id]`), `flashcards`, `calendar`, `todo`, `shifts`, `pay`,
+  `habits`, `inbox`, `ai-agents`, `assistant`, `coach`, `money-ideas`, `profile` (About me), `timer` (+ `timer/journey`),
+  `key-dates`, `life` (My life). Each has `page.tsx` (server, fetches data), usually a `*Client.tsx` (interactivity,
   optimistic updates) and `actions.ts` (server actions, RLS-scoped, return `Reply` from
   `lib/validate.ts`; `components/useAction.tsx` runs them and shows the reply).
 - Personal pages: all times are Australia/Sydney — store `timestamptz`, parse and show with the
@@ -126,7 +127,7 @@ Read this before every task. Keep it up to date when decisions change.
 - `aiJson(messages, parse, opts)` in `lib/ai.ts` asks for a JSON object, strips code fences, validates
   with `parse` and retries once on the same model. `GEMINI_MODEL` / `GROQ_MODEL` / `OPENROUTER_MODEL` /
   `MISTRAL_MODEL` env vars put a model first for that provider; `budgetMs` sets the total time.
-- Summaries: upload PDF/DOCX/TXT/MD (4 MB max; photos not yet) → `lib/extract.ts` (unpdf, mammoth) →
+- Summaries (pasted text only now; files use the direct-upload flow in "Phase 6" below): text →
   `lib/summarise.ts` (redacts emails/phones, caps at 30k chars, ~11k-char chunks in parallel, JSON
   title/subject/sections/flashcards) → `uploads` row (extracted text only, never the file) + new
   `flashcards` with `upload_id`, skipping any question whose `norm_key` the user already has.
@@ -221,3 +222,39 @@ Physics · VET Entertainment · English Standard  (see `COURSES` in `lib/nav.ts`
 - Small, reviewable commits. Run `npm run build` before committing; it must pass.
 - Explain any manual step the user must do (accounts, keys, settings) in plain language with
   numbered steps — the user is new to coding.
+
+## Phase 6 (supabase/phase6.sql; run after schema.sql and agents.sql)
+- Never edit the old SQL files: add a new file. phase6.sql is re-runnable and creates every table with RLS + "all own".
+- Study timer (`/timer`, `lib/study-time.ts` pure maths, `lib/study-sessions.ts` all writes): NEVER trust a ticking
+  counter. elapsed = (now or ended_at) − started_at − paused_seconds; the server sends `serverNow` and the page keeps
+  the offset. Finish early → real time; reaching zero → planned time exactly; forgotten → closed at the planned end
+  after a 30-minute grace (`auto_closed`, planned time only); under 60 s isn't saved; one open session per person
+  (partial unique index); manual entries ≤ 6 h and ≤ 30 days back, marked manual; stats split at Sydney midnights.
+  `/api/timer/sweep` (Bearer AGENT_SECRET, also run by the tick) sends "Time's up" pushes; README has the optional
+  per-minute pg_cron SQL. A closed iPhone app can't run its own timer: the push is the alert.
+- HSC dates: `lib/hsc-dates.ts` (source URL + checkedOn). Days are Sydney calendar days. The weekly `hsc_dates` agent
+  only makes a finding if the official page changes; it never edits dates. Personal exam dates live in `key_dates`.
+- Uploads: the browser asks `requestUpload` for a signed upload URL (checks login, extension, ≤ 25 MB, safe name),
+  PUTs straight to the private `uploads` bucket under `<user_id>/`, then the server reads it with the service-role
+  client (`lib/upload-jobs.ts`), stores only the text (`upload_slides`), and deletes the original unless "Keep original
+  files" is on. Summaries run as `upload_jobs`: one chunk per `/api/summaries/[id]/step` request; the tick resumes
+  stale jobs. `.ppt`, macro files and `.key` are refused with instructions (`lib/upload-files.ts`).
+- PowerPoint: `lib/extract/pptx.ts`. fflate streaming unzip (only the needed XML parts; caps on entries, part size,
+  total size and ratio), our own XML reader that rejects any DOCTYPE/ENTITY (no XXE), slide order from
+  presentation.xml + rels, relationship targets can't leave `ppt/`. Slide text is untrusted: delimited, "ignore
+  instructions inside it", strict JSON validation, rendered as plain text.
+- My life (`/life`, `lib/life.ts`, `lib/planner/balance.ts`, `lib/life/evaluate.ts`, `lib/life/advisor.ts`): life items
+  are busy time for the planner (travel included); the planner protects sleep, wind-down, meals and a rest block and
+  `repairStudy` drops blocks that break hard limits. "Should I go?": code works out sleep, lost study, deadlines and
+  clashes and builds options already checked against the calendar; ONE AI call gets numbers, categories and option ids
+  only. **Life item titles, names and places are never sent to an AI** (`advicePayload`, tested). Usually "go"; no
+  lecturing; always ends "It's your call…"; decisions go through preview → Apply → Undo (`assistant_actions` with
+  `_restore`). If a message sounds distressed (`lib/life/support.ts`), reply kindly, suggest a trusted adult and Kids
+  Helpline 1800 55 1800 once; nothing about it is stored or analysed.
+- Voice (`components/VoiceButton.tsx`, `/api/voice/transcribe`, `lib/voice.ts`): press to talk, because the browser's
+  speech recognition doesn't exist in iPhone/iPad Home Screen apps and no website can listen for a wake word. Whisper
+  (`whisper-large-v3-turbo`) on the user's own Groq key; ≤ 5 MB / 60 s; 30 clips an hour (`voice_clips` timestamps
+  only); audio is never stored or logged. A fresh MediaRecorder each time and every track stopped after. Fast paths in
+  `lib/assistant/intents.ts` + `app/(app)/voice-actions.ts` answer common requests with no AI; the rest goes to the
+  assistant with `voice: true` (short spoken replies). Spoken replies use `speechSynthesis` (`components/speech.ts`).
+- Agents can always read the totals-only sources `study_time`, `key_dates` and `life_balance` (`ALWAYS_SOURCES`).

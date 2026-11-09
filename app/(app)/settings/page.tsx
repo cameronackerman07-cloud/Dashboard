@@ -110,7 +110,7 @@ export default async function SettingsPage({ searchParams }: Props) {
       <SpotifyConnect
         connected={profile ? (await listConnections(profile.id, "spotify")).length > 0 : false}
         configured={spotifyConfigured()}
-        notice={spotify === "connected" ? "Spotify connected." : spotify === "failed" ? "Spotify didn't finish connecting. If you're a friend, ask Cameron to add your Spotify email to the app first." : null}
+        notice={spotify === "connected" ? "Spotify connected." : spotify === "not-allowed" ? "Spotify said no: ask the app owner to add your Spotify email in the Spotify developer dashboard, then connect again." : spotify === "failed" ? "Spotify didn't finish connecting. Ask the app owner to add your Spotify email first, then try again." : null}
       />
 
       <CanvasConnect

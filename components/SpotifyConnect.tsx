@@ -15,7 +15,7 @@ export function SpotifyConnect({ connected, configured, notice }: { connected: b
         </span>
         <div className="list-text">
           <span className="list-name">Spotify</span>
-          <span className="list-desc">Now playing on Home, with play, pause and next (controls need Premium). Ask Cameron to add your Spotify email first: the app allows 5 people.</span>
+          <span className="list-desc">Now playing on Home, with play, pause and next (controls need Premium). Spotify only lets this app work for 5 people, each added by email by the app owner (who needs Premium). Ask the app owner to add your Spotify email before you connect.</span>
         </div>
         <span className="list-desc">{connected ? "Connected" : configured ? "Not connected" : "Not set up yet"}</span>
         {connected ? (
