@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
+import { speak, speakReplies } from "@/components/speech";
 import { ReplyLine, useAction } from "@/components/useAction";
 import { formatTime } from "@/lib/time";
 import type { Reply } from "@/lib/validate";
@@ -197,7 +198,7 @@ function AppliedLine({ a }: { a: Applied }) {
   );
 }
 
-export function AssistantClient({ initial, askFirst: initialAskFirst }: { initial: string; askFirst: boolean }) {
+export function AssistantClient({ initial, initialVoice = false, askFirst: initialAskFirst }: { initial: string; initialVoice?: boolean; askFirst: boolean }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [statuses, setStatuses] = useState<Record<string, Status>>({});
   const [input, setInput] = useState(initial);
@@ -207,11 +208,23 @@ export function AssistantClient({ initial, askFirst: initialAskFirst }: { initia
   const endRef = useRef<HTMLDivElement>(null);
   const sentInitial = useRef(false);
 
+  // Voice from the floating mic while this page is open.
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const text = (e as CustomEvent<{ text: string }>).detail?.text;
+      if (text) void send(text, true);
+    };
+    window.addEventListener("voice:ask", onAsk);
+    return () => window.removeEventListener("voice:ask", onAsk);
+  });
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
 
-  async function send(text: string) {
+  const [heard, setHeard] = useState<string | null>(null);
+
+  async function send(text: string, voice = false) {
     const t = text.trim();
     if (!t || pending) return;
     const history = messages
@@ -221,12 +234,17 @@ export function AssistantClient({ initial, askFirst: initialAskFirst }: { initia
     setInput("");
     setPending(true);
     try {
-      const res = await askAssistant(t, history);
+      const res = await askAssistant(t, history, undefined, { voice });
       if (!res.ok) setMessages((m) => [...m, { role: "error", text: res.message }]);
       else {
         const proposals = res.proposals ?? [];
         setStatuses((s) => ({ ...s, ...Object.fromEntries(proposals.map((p) => [p.key, { state: "waiting" } as Status])) }));
         setMessages((m) => [...m, { role: "assistant", text: res.reply ?? "", mode: res.mode, note: res.message || undefined, proposals, applied: res.applied ?? [], model: res.model }]);
+        // Spoken replies, only for voice messages (and only if "Speak replies" is on).
+        if (voice && speakReplies() && res.reply) {
+          const ok = speak(res.reply);
+          setHeard(ok ? null : res.reply);
+        }
       }
     } catch {
       setMessages((m) => [...m, { role: "error", text: "Couldn't reach the server. Check your connection and try again." }]);
@@ -238,7 +256,7 @@ export function AssistantClient({ initial, askFirst: initialAskFirst }: { initia
   useEffect(() => {
     if (initial && !sentInitial.current) {
       sentInitial.current = true;
-      void send(initial);
+      void send(initial, initialVoice);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -285,6 +303,11 @@ export function AssistantClient({ initial, askFirst: initialAskFirst }: { initia
           ),
         )}
         {pending ? <p className="card-meta">Thinking…</p> : null}
+        {heard ? (
+          <button type="button" className="btn btn-small" onClick={() => (speak(heard), setHeard(null))}>
+            Tap to hear the reply
+          </button>
+        ) : null}
         <div ref={endRef} />
       </section>
 
@@ -300,6 +323,9 @@ export function AssistantClient({ initial, askFirst: initialAskFirst }: { initia
           <span className="sr-only">Message The BRIAN</span>
           <input value={input} onChange={(e) => setInput(e.target.value)} type="text" placeholder="Ask anything, or ask it to do something…" maxLength={4000} />
         </label>
+        <button type="button" className="icon-btn" aria-label="Speak instead of typing" onClick={() => window.dispatchEvent(new Event("voice:open"))}>
+          <Icon name="mic" />
+        </button>
         <button type="submit" className="btn btn-dark" style={{ minHeight: 44 }} disabled={pending || !input.trim()}>
           Send
         </button>

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppBadge } from "@/components/AutoRefresh";
 import { Sidebar } from "@/components/Sidebar";
 import { TimerChip } from "@/components/TimerChip";
+import { VoiceButton } from "@/components/VoiceButton";
 import { activeSession } from "@/lib/study-sessions";
 import { ensureDefaultAgents } from "@/lib/agents/defaults";
 import { initials } from "@/lib/auth";
@@ -37,6 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       />
       {children}
       <TimerChip session={timer} serverNow={Date.now()} />
+      <VoiceButton />
       <AppBadge count={unread ?? 0} />
     </div>
   );
