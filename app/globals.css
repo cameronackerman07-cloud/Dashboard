@@ -860,3 +860,11 @@ details > summary.btn { list-style: none; display: inline-flex; margin-bottom: 1
 .exam-row { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; margin: 0; display: grid; grid-template-columns: 1fr 120px; gap: 8px; min-width: 0; }
 .exam-row legend { padding: 0 4px; }
 .exam-grid .note-actions { grid-column: 1 / -1; }
+
+/* ---------- Summaries: big uploads ---------- */
+.estimate { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; }
+.file-kind { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 24px; padding: 0 6px; margin-right: 8px; border: 1.5px solid var(--ink); border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+.slide-jump { display: flex; flex-wrap: wrap; gap: 6px; }
+.slide-jump a { min-height: 36px; display: inline-flex; align-items: center; padding: 0 10px; text-decoration: none; }
+.card-pick { cursor: pointer; align-items: flex-start; }
+.check-input { width: 22px; height: 22px; flex: none; accent-color: var(--ink); margin-top: 2px; }

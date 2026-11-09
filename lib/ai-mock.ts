@@ -35,6 +35,14 @@ const MOCKS: Record<string, (user: string) => unknown> = {
     savings: 30,
     tips: ["Mock tip: pack lunch twice this week."],
   }),
+  slides: (user) => {
+    const nums = [...user.matchAll(/\[(?:Slide|Part) (\d+)/g)].map((m) => Number(m[1]));
+    return {
+      slide_summaries: nums.map((n) => ({ slide: n, bullets: [`Mock point for ${n}.`] })),
+      flashcards: nums.slice(0, 3).map((n) => ({ front: `Mock question about part ${n}?`, back: "A mock answer.", slide: n, module: "Mock module", topic: "Mock topic" })),
+    };
+  },
+  deck_final: () => ({ title: "Mock deck", subject: "Physics", module: "Kinematics", topic: "Motion", key_points: ["Mock key point one.", "Mock key point two."] }),
   report: () => ({ headline: "Mock briefing: nothing urgent today.", sections: [{ heading: "Today", points: ["Mock point."] }] }),
 };
 

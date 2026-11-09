@@ -1,7 +1,7 @@
 import "server-only";
 
-// Pulls the text out of an uploaded file, on the server. Only the text is kept;
-// the file itself is never stored.
+// Pulls the text out of an uploaded file, on the server. Only the text is kept
+// (the original is deleted after processing unless "Keep original files" is on).
 
 export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // Vercel refuses request bodies over 4.5 MB
 
@@ -38,12 +38,17 @@ function tidy(text: string): string {
 export async function extractText(file: File): Promise<string> {
   if (file.size === 0) throw new ExtractError("That file is empty.");
   if (file.size > MAX_UPLOAD_BYTES) throw new ExtractError("That file is over 4 MB. Split it into smaller files, or paste the text instead.");
+  return extractBytes(file.name, new Uint8Array(await file.arrayBuffer()));
+}
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const kind = kindOf(file.name, bytes);
+// Text from a PDF, Word or text file already in memory (used for uploads that
+// went straight to Storage, up to 25 MB).
+export async function extractBytes(name: string, bytes: Uint8Array): Promise<string> {
+  if (bytes.length === 0) throw new ExtractError("That file is empty.");
+  const kind = kindOf(name, bytes);
 
-  if (kind === "image") throw new ExtractError("Photos are coming later. For now, upload a PDF, Word (.docx), .txt or .md file.");
-  if (!kind) throw new ExtractError("That type of file isn't supported. Upload a PDF, Word (.docx), .txt or .md file.");
+  if (kind === "image") throw new ExtractError("Photos are coming later. For now, upload a PowerPoint (.pptx), PDF, Word (.docx), .txt or .md file.");
+  if (!kind) throw new ExtractError("That type of file isn't supported. Upload a PowerPoint (.pptx), PDF, Word (.docx), .txt or .md file.");
 
   let text = "";
   try {

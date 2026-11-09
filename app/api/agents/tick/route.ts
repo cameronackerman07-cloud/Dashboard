@@ -4,6 +4,7 @@ import { bearerMatches } from "@/lib/bearer";
 import { syncGoogle } from "@/lib/sources/google";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
 import { sweepTimers } from "@/lib/timer-sweep";
+import { continueStaleJobs } from "@/lib/upload-jobs";
 
 // Called every 30 minutes by .github/workflows/agents-tick.yml (or Supabase
 // pg_cron) with "Authorization: Bearer <AGENT_SECRET>". Runs every due agent,
@@ -60,7 +61,9 @@ async function tick(request: Request) {
     if (Date.now() - started > STOP_STARTING_AFTER_MS) break;
     synced += (await syncGoogle(userId, { olderThanMs: 25 * 60_000 }).catch(() => [])).length;
   }
-  Object.assign(totals, { googleSynced: synced, timersAlerted: timers.alerted, timersClosed: timers.closed });
+  // Summaries whose page was closed part-way: keep going while time allows.
+  const uploadSteps = await continueStaleJobs(db, started + STOP_STARTING_AFTER_MS).catch(() => 0);
+  Object.assign(totals, { uploadSteps, googleSynced: synced, timersAlerted: timers.alerted, timersClosed: timers.closed });
   console.log(`Agents tick: ${JSON.stringify(totals)}`);
   return NextResponse.json({ ok: true, ...totals });
 }

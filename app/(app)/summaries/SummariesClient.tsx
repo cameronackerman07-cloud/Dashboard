@@ -7,6 +7,7 @@ import { SubjectOptions } from "@/components/SubjectSelect";
 import { ReplyLine, useAction } from "@/components/useAction";
 import type { AiModelOption } from "@/lib/ai";
 import type { SummarySection } from "@/lib/summarise";
+import { DirectUpload } from "./DirectUpload";
 import { deleteUpload, saveSummaryToNotes, summariseUpload, type UploadReply } from "./actions";
 
 export type PastUpload = {
@@ -18,10 +19,11 @@ export type PastUpload = {
   cardCount: number;
   truncated: boolean;
   date: string;
+  kind: string;
+  status: string;
 };
 
-const MAX_BYTES = 4 * 1024 * 1024;
-const ACCEPT = ".pdf,.docx,.txt,.md,.markdown,application/pdf,text/plain,text/markdown";
+const KIND_LABEL: Record<string, string> = { pptx: "PPTX", pdf: "PDF", docx: "DOCX", txt: "TXT", md: "MD" };
 
 function Sections({ sections }: { sections: SummarySection[] }) {
   return (
@@ -44,28 +46,16 @@ export function SummariesClient({ models, history }: { models: AiModelOption[]; 
   const [pending, startTransition] = useTransition();
   const [model, setModel] = useAiModel(models);
   const [result, setResult] = useState<UploadReply | null>(null);
-  const [fileName, setFileName] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (pending) return;
     const form = new FormData(e.currentTarget);
-    const file = form.get("file");
-    const hasFile = file instanceof File && file.size > 0;
-    if (hasFile && file.size > MAX_BYTES) {
-      setResult({ ok: false, message: "That file is over 4 MB. Split it into smaller files, or paste the text instead." });
+    if (String(form.get("text") ?? "").trim().length < 40) {
+      setResult({ ok: false, message: "Paste at least a few sentences." });
       return;
     }
-    if (hasFile && /\.(png|jpe?g|heic|heif|webp|gif)$/i.test(file.name)) {
-      setResult({ ok: false, message: "Photos are coming later. For now, upload a PDF, Word (.docx), .txt or .md file." });
-      return;
-    }
-    if (!hasFile && String(form.get("text") ?? "").trim().length < 40) {
-      setResult({ ok: false, message: "Choose a file, or paste at least a few sentences." });
-      return;
-    }
-    if (!hasFile) form.delete("file");
     form.set("model", model);
     setResult(null);
     startTransition(async () => {
@@ -74,7 +64,6 @@ export function SummariesClient({ models, history }: { models: AiModelOption[]; 
         setResult(res);
         if (res.ok) {
           formRef.current?.reset();
-          setFileName("");
         }
       } catch {
         setResult({ ok: false, message: "Couldn't reach the server, or it took too long. Try again, or try a smaller file." });
@@ -84,12 +73,10 @@ export function SummariesClient({ models, history }: { models: AiModelOption[]; 
 
   return (
     <>
-      <section className="card" aria-label="Upload">
-        <h2 className="card-title">Upload a file</h2>
-        <p className="privacy-note" role="note">
-          Don&apos;t upload anything with personal details. Free AI models may use what you send to improve themselves, so
-          only school content goes to them.
-        </p>
+      <DirectUpload />
+
+      <section className="card" aria-label="Paste text">
+        <h2 className="card-title">Or paste text</h2>
         <form ref={formRef} className="track-form" onSubmit={submit}>
           <ModelPicker models={models} value={model} onChange={setModel} />
           <label className="field">
@@ -99,26 +86,11 @@ export function SummariesClient({ models, history }: { models: AiModelOption[]; 
               <SubjectOptions />
             </select>
           </label>
-          <label className="file-drop">
-            <input
-              type="file"
-              name="file"
-              accept={ACCEPT}
-              className="sr-only"
-              onChange={(e) => setFileName(e.target.files?.[0]?.name ?? "")}
-            />
-            <span className="file-drop-main">{fileName || "Choose a PDF, Word, .txt or .md file"}</span>
-            <span className="field-help">Up to 4 MB. Photos are coming later.</span>
-          </label>
-          <details className="more">
-            <summary>Or paste text instead</summary>
-            <textarea name="text" className="input note-body" rows={8} placeholder="Paste notes, a worksheet or a passage…" aria-label="Text to summarise" />
-          </details>
+          <textarea name="text" className="input note-body" rows={6} placeholder="Paste notes, a worksheet or a passage…" aria-label="Text to summarise" />
           <div className="note-actions">
             <button type="submit" className="btn btn-dark" disabled={pending}>
-              {pending ? "Reading and summarising…" : "Summarise and make flashcards"}
+              {pending ? "Summarising…" : "Summarise and make flashcards"}
             </button>
-            {pending ? <span className="card-meta">This can take up to a minute for a long file.</span> : null}
           </div>
         </form>
         {result && !result.ok ? (
@@ -170,15 +142,23 @@ function History({ history }: { history: PastUpload[] }) {
           {history.map((u) => (
             <details className="upload" key={u.id}>
               <summary>
+                <span className="file-kind" aria-label={`${KIND_LABEL[u.kind] ?? "Text"} file`}>
+                  {KIND_LABEL[u.kind] ?? "TEXT"}
+                </span>
                 <span className="task-title">{u.title}</span>
                 <span className="task-sub">
-                  {[u.subject, u.date, `${u.cardCount} card${u.cardCount === 1 ? "" : "s"}`, u.filename].filter(Boolean).join(" · ")}
+                  {[u.status === "ready" ? null : u.status === "failed" ? "Couldn't be read" : "Not finished", u.subject, u.date, `${u.cardCount} card${u.cardCount === 1 ? "" : "s"}`, u.filename]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </span>
               </summary>
               <div className="upload-body">
                 {u.truncated ? <p className="card-meta">Only the first part of this file was summarised.</p> : null}
                 <Sections sections={u.sections} />
                 <div className="note-actions">
+                  <Link href={`/summaries/${u.id}`} className="btn btn-small btn-dark">
+                    {u.status === "ready" ? "Open" : "Continue"}
+                  </Link>
                   <Link href={`/flashcards?subject=${encodeURIComponent(u.subject ?? "")}`} className="btn btn-small">
                     Flashcards
                   </Link>

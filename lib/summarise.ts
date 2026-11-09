@@ -85,7 +85,7 @@ function parseChunk(value: unknown): ChunkAnswer | null {
   return { title: str(v.title, 120), subject: matchSubject(v.subject), sections, flashcards };
 }
 
-function moduleHint(subject: string | null): string {
+export function moduleHint(subject: string | null): string {
   const subjects = subject ? [subject] : COURSES;
   const lines = subjects
     .map((s) => {
