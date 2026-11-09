@@ -83,6 +83,13 @@ Run `supabase/phase6.sql` after `schema.sql` and `agents.sql`. It creates the ti
 and voice tables, and the private Storage bucket `uploads` with its policies. Voice needs each person's
 own free Groq key (Settings → AI keys).
 
+## Phase 7 setup
+
+Run `supabase/phase7.sql` after `phase6.sql`. It adds each person's year (7–12) and subjects to
+`profiles`, allows photo uploads in Summaries, and reloads the API's table cache. Anyone can make an
+account with just the site's URL, an email and a password; they then pick their year and subjects.
+Reading pictures in uploads needs a vision model (a free Gemini key); charts need no AI.
+
 ## For Claude Code
 
 Project rules, design, data sources and build phases are in `CLAUDE.md`.

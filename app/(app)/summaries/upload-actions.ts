@@ -42,7 +42,7 @@ export async function requestUpload(p: { name: string; size: number; subject?: s
     keep_original: !!p.keepOriginal,
     size_bytes: Math.round(size),
   });
-  if (error) return { ok: false, message: "Couldn't start the upload. Has supabase/phase6.sql been run?" };
+  if (error) return { ok: false, message: k.kind === "image" ? "Couldn't start the upload. Run supabase/phase7.sql in Supabase so photos can be uploaded." : "Couldn't start the upload. Has supabase/phase6.sql been run?" };
   const { data, error: e2 } = await createAdminClient().storage.from("uploads").createSignedUploadUrl(path);
   if (e2 || !data) {
     await db.from("uploads").delete().eq("id", id);

@@ -47,7 +47,7 @@ export function DeckResult({
             <li key={i}>{p}</li>
           ))}
         </ul>
-        {lowText.length ? <p className="card-meta">Slides {lowText.join(", ")} were skipped: they&apos;re mostly pictures, and photos and diagrams aren&apos;t read yet.</p> : null}
+        {lowText.length ? <p className="card-meta">Slides {lowText.join(", ")} were skipped: they had no text and no pictures the AI could read.</p> : null}
         {model ? <p className="card-meta">Summarised by {model}.</p> : null}
       </section>
 

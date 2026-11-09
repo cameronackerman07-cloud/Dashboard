@@ -89,7 +89,7 @@ Read this before every task. Keep it up to date when decisions change.
   link via `app/auth/confirm`, which only redirects to paths on this site; then set a password in Settings).
 - Sign-in, sign-up and the forgot-password email are route handlers in `app/api/auth/*`. Sign-up uses the
   service-role client (`lib/supabase/admin.ts`) to `auth.admin.createUser({ email_confirm: true })`, so
-  no confirmation email. If `INVITE_CODE` is set, sign-up needs it (`lib/auth.ts`, compared in constant time).
+  no confirmation email and no invite code: an email and password are all anyone needs. New accounts pick their year and subjects on `/welcome`.
 - `proxy.ts` (Next 16 middleware) refreshes the session and gates every route; public: `/login`,
   `/auth/*`, `/api/auth/*`, `/api/cron/*` (checks `CRON_SECRET` itself), `/privacy`, `/terms`, manifest, icons.
 - Supabase clients: `lib/supabase/client.ts` (browser), `server.ts` (server components, route handlers,
@@ -173,7 +173,7 @@ Read this before every task. Keep it up to date when decisions change.
   encrypted with `TOKEN_ENCRYPTION_KEY` (AES-256-GCM), and only decrypted server-side.
 - Supabase tables must have Row Level Security on; each row belongs to `auth.uid()`.
 
-## Courses (use these exact names)
+## Courses (the owner's own; everyone else picks theirs: see Phase 7)
 Engineering Studies · Mathematics Advanced · Mathematics Extension 1 · Mathematics Extension 2 ·
 Physics · VET Entertainment · English Standard  (see `COURSES` in `lib/nav.ts`)
 
@@ -258,3 +258,19 @@ Physics · VET Entertainment · English Standard  (see `COURSES` in `lib/nav.ts`
   `lib/assistant/intents.ts` + `app/(app)/voice-actions.ts` answer common requests with no AI; the rest goes to the
   assistant with `voice: true` (short spoken replies). Spoken replies use `speechSynthesis` (`components/speech.ts`).
 - Agents can always read the totals-only sources `study_time`, `key_dates` and `life_balance` (`ALWAYS_SOURCES`).
+
+## Phase 7 (supabase/phase7.sql; run after phase6.sql)
+- Sign-up is email + password only: no invite code (INVITE_CODE is ignored), name optional (defaults to the email's first part).
+- Everyone picks a year (7–12) and subjects: `/welcome` (the app layout redirects there until both are set; skipped
+  if phase7.sql hasn't run) and Settings → Year and subjects. Lists: `lib/junior-subjects.ts` (Years 7–10, NESA
+  syllabuses, both names where NESA renamed a course) and `STAGE6_GROUPS` in `lib/subjects.ts` (Years 11–12).
+  Use `getMySubjects()` / `getSchool()` (`lib/my-subjects.ts`) on the server and `useMySubjects()` in the browser;
+  `COURSES` in lib/nav.ts is only the fallback before phase7.sql runs. Never hard-code one person's courses again.
+- Pictures and charts in uploads: charts are parsed from the chart XML (`lib/extract/charts.ts`, real numbers, no AI).
+  Pictures (`lib/extract/pictures.ts`: PowerPoint, Word, PDF images incl. scans via `lib/extract/png.ts`, photos)
+  are stored under `<user>/<upload>/pics/` and read by a vision AI as job steps before the chunks (≤ 4 per call,
+  ≤ 12 MB), then deleted; only the text is kept, run through redact + sanitizeForAI. Logos (same picture on 3+
+  slides), icons (< 6 KB), EMF/WMF/SVG are skipped; 24 pictures per file at most. No vision model → pictures are
+  skipped and the text is still summarised.
+- The "Should I go?" advisor states a clear recommendation (VERDICT_TEXT in lib/life/evaluate.ts); the student decides.
+

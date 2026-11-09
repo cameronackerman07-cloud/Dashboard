@@ -3,7 +3,8 @@
 //
 // Safety:
 // - Zip: fflate's streaming unzip. Only the few XML parts we need are ever
-//   decompressed; pictures, video and everything else are skipped unread.
+//   decompressed (pictures only when asked for, by path, with the same caps);
+//   video and everything else are skipped unread.
 //   Caps on the number of entries, the size of each part, the total size and
 //   the compression ratio stop zip bombs.
 // - XML: our own small tag reader. Any DOCTYPE or ENTITY declaration is
@@ -13,6 +14,7 @@
 //   external links are ignored.
 
 import { Unzip, UnzipInflate } from "fflate";
+import { chartLines, readChartXml } from "./charts";
 
 export class PptxError extends Error {
   constructor(message: string) {
@@ -42,7 +44,16 @@ export type PptxSlide = {
   altText: string[];
 };
 
-export type PptxResult = { slides: PptxSlide[]; lowTextSlides: number[]; hiddenSlides: number[]; charts: number; pictures: number };
+// A picture on a slide, by its path inside the zip (read later, only if wanted).
+export type SlidePicture = { slide: number; path: string };
+export type PptxResult = { slides: PptxSlide[]; lowTextSlides: number[]; hiddenSlides: number[]; charts: number; pictures: number; images: SlidePicture[] };
+
+// Picture formats a vision AI can read. Others (EMF, WMF, SVG, TIFF) are skipped.
+export const READABLE_IMAGE = /\.(png|jpe?g|webp|heic|heif)$/i;
+export function imageMime(path: string): string {
+  const ext = path.toLowerCase().split(".").pop() ?? "";
+  return ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : ext === "heic" ? "image/heic" : ext === "heif" ? "image/heif" : "image/jpeg";
+}
 
 const BAD = "That PowerPoint file looks damaged or unsafe, so it wasn't read. Open it in PowerPoint, Keynote or Google Slides and save it as .pptx again.";
 
@@ -54,11 +65,20 @@ function wanted(name: string): boolean {
     name === "ppt/_rels/presentation.xml.rels" ||
     /^ppt\/slides\/slide\d+\.xml$/.test(name) ||
     /^ppt\/slides\/_rels\/slide\d+\.xml\.rels$/.test(name) ||
-    /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(name)
+    /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(name) ||
+    /^ppt\/charts\/chart\d+\.xml$/.test(name)
   );
 }
 
-export function unzipParts(bytes: Uint8Array, limits = PPTX_LIMITS): Map<string, string> {
+export function unzipParts(bytes: Uint8Array, limits = PPTX_LIMITS, want: (name: string) => boolean = wanted): Map<string, string> {
+  const out = new Map<string, string>();
+  const dec = new TextDecoder("utf-8");
+  for (const [name, buf] of unzipRaw(bytes, want, limits)) out.set(name, dec.decode(buf));
+  return out;
+}
+
+// The raw bytes of the parts `want` picks (pictures, by exact path).
+export function unzipRaw(bytes: Uint8Array, want: (name: string) => boolean, limits = PPTX_LIMITS): Map<string, Uint8Array> {
   const parts = new Map<string, Uint8Array[]>();
   let entries = 0;
   let total = 0;
@@ -71,7 +91,7 @@ export function unzipParts(bytes: Uint8Array, limits = PPTX_LIMITS): Map<string,
       failure = "too many files";
       return;
     }
-    if (failure || !wanted(file.name)) return; // never decompressed
+    if (failure || !want(file.name)) return; // never decompressed
     const declared = file.originalSize ?? 0;
     const packed = file.size ?? 0;
     if (declared > limits.maxPartBytes || (packed > 0 && declared / packed > limits.maxRatio)) {
@@ -110,8 +130,7 @@ export function unzipParts(bytes: Uint8Array, limits = PPTX_LIMITS): Map<string,
     failure = failure ?? "corrupt";
   }
   if (failure) throw new PptxError(BAD);
-  const out = new Map<string, string>();
-  const dec = new TextDecoder("utf-8");
+  const out = new Map<string, Uint8Array>();
   for (const [name, chunks] of parts) {
     const len = chunks.reduce((a, c) => a + c.length, 0);
     const buf = new Uint8Array(len);
@@ -120,7 +139,7 @@ export function unzipParts(bytes: Uint8Array, limits = PPTX_LIMITS): Map<string,
       buf.set(c, o);
       o += c.length;
     }
-    out.set(name, dec.decode(buf));
+    out.set(name, buf);
   }
   return out;
 }
@@ -168,13 +187,13 @@ export function* tokens(xml: string): Generator<XmlTag> {
 
 type Rel = { id: string; type: string; target: string };
 
-function rels(xml: string | undefined, baseDir: string): Rel[] {
+export function rels(xml: string | undefined, baseDir: string, root = "ppt"): Rel[] {
   if (!xml) return [];
   const out: Rel[] = [];
   for (const t of tokens(xml)) {
     if ("name" in t && !t.close && t.name === "Relationship") {
       if ((t.attrs.TargetMode ?? "").toLowerCase() === "external") continue;
-      const target = resolve(baseDir, t.attrs.Target ?? "");
+      const target = resolve(baseDir, t.attrs.Target ?? "", root);
       if (target) out.push({ id: t.attrs.Id ?? "", type: t.attrs.Type ?? "", target });
     }
   }
@@ -182,8 +201,8 @@ function rels(xml: string | undefined, baseDir: string): Rel[] {
 }
 
 // "slides/slide1.xml" relative to "ppt" → "ppt/slides/slide1.xml". Anything
-// that would leave ppt/ (or is absolute or a URL) is refused.
-export function resolve(baseDir: string, target: string): string | null {
+// that would leave ppt/ (or word/ for Word files; or is absolute or a URL) is refused.
+export function resolve(baseDir: string, target: string, root = "ppt"): string | null {
   if (!target || /^[a-z]+:/i.test(target) || target.includes("\\")) return null;
   const parts = (target.startsWith("/") ? target.slice(1) : `${baseDir}/${target}`).split("/");
   const stack: string[] = [];
@@ -195,15 +214,17 @@ export function resolve(baseDir: string, target: string): string | null {
     } else stack.push(p);
   }
   const path = stack.join("/");
-  return path.startsWith("ppt/") ? path : null;
+  return path.startsWith(`${root}/`) ? path : null;
 }
 
 // --- slides -----------------------------------------------------------------
 
 type ShapeText = { title: boolean; lines: string[] };
 
-export function readSlideXml(xml: string): { title: string | null; body: string[]; tables: string[][]; hidden: boolean; charts: number; pictures: number; altText: string[] } {
+export function readSlideXml(xml: string): { title: string | null; body: string[]; tables: string[][]; hidden: boolean; charts: number; pictures: number; altText: string[]; chartIds: string[]; pictureIds: string[] } {
   let hidden = false;
+  const chartIds: string[] = [];
+  const pictureIds: string[] = [];
   let charts = 0;
   let pictures = 0;
   const altText: string[] = [];
@@ -278,16 +299,19 @@ export function readSlideXml(xml: string): { title: string | null; body: string[
         pictures++;
       }
       if (close || selfClose) inPic = false;
+    } else if (name === "a:blip" && inPic && !close && attrs["r:embed"]) {
+      pictureIds.push(attrs["r:embed"]);
     } else if (name === "p:cNvPr" && inPic && attrs.descr) {
       altText.push(attrs.descr.replace(/\s+/g, " ").trim().slice(0, 300));
     } else if (name === "c:chart" && !close) {
       charts++;
+      if (attrs["r:id"]) chartIds.push(attrs["r:id"]);
     }
   }
   const titleShape = shapes.find((s) => s.title && s.lines.length);
   const title = titleShape ? titleShape.lines.map((l) => l.trim()).join(" ").slice(0, 300) : null;
   const body = shapes.filter((s) => s !== titleShape).flatMap((s) => s.lines);
-  return { title, body, tables, hidden, charts, pictures, altText };
+  return { title, body, tables, hidden, charts, pictures, altText, chartIds, pictureIds };
 }
 
 function readNotes(xml: string | undefined): string | null {
@@ -344,6 +368,7 @@ export function readPptx(bytes: Uint8Array, limits = PPTX_LIMITS): PptxResult {
   if (order.length > limits.maxSlides) throw new PptxError(`That deck has ${order.length} slides. Split it into files of up to ${limits.maxSlides} slides.`);
 
   const slides: PptxSlide[] = [];
+  const images: SlidePicture[] = [];
   order.forEach((path, i) => {
     const xml = files.get(path);
     if (!xml) return;
@@ -353,8 +378,24 @@ export function readPptx(bytes: Uint8Array, limits = PPTX_LIMITS): PptxResult {
     const notesRel = slideRels.find((r) => /\/notesSlide$/.test(r.type) && /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(r.target));
     const notes = notesRel ? readNotes(files.get(notesRel.target)) : null;
     const tableLines = s.tables.flat();
-    const bodyLines = [...s.body, ...(tableLines.length ? ["Table:", ...tableLines.map((l) => `  ${l}`)] : []), ...s.altText.map((a) => `[Picture: ${a}]`)];
-    const visibleChars = [...s.body, ...tableLines].join("").replace(/\s/g, "").length;
+    const byId = new Map(slideRels.map((r) => [r.id, r.target]));
+    // Charts: read straight from the chart's data, so the real numbers are kept.
+    const chartText = s.chartIds.flatMap((id) => {
+      const target = byId.get(id);
+      const xml = target && /^ppt\/charts\/chart\d+\.xml$/.test(target) ? files.get(target) : undefined;
+      if (!xml) return [];
+      try {
+        return chartLines(readChartXml(xml));
+      } catch {
+        return [];
+      }
+    });
+    for (const id of s.pictureIds) {
+      const target = byId.get(id);
+      if (target && /^ppt\/media\/[\w.-]+$/.test(target) && READABLE_IMAGE.test(target)) images.push({ slide: i + 1, path: target });
+    }
+    const bodyLines = [...s.body, ...(tableLines.length ? ["Table:", ...tableLines.map((l) => `  ${l}`)] : []), ...chartText, ...s.altText.map((a) => `[Picture: ${a}]`)];
+    const visibleChars = [...s.body, ...tableLines, ...chartText].join("").replace(/\s/g, "").length;
     slides.push({
       position: i + 1,
       title: s.title,
@@ -375,6 +416,7 @@ export function readPptx(bytes: Uint8Array, limits = PPTX_LIMITS): PptxResult {
     hiddenSlides: slides.filter((s) => s.hidden).map((s) => s.position),
     charts: slides.reduce((a, s) => a + s.charts, 0),
     pictures: slides.reduce((a, s) => a + s.pictures, 0),
+    images,
   };
 }
 

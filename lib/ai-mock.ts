@@ -42,6 +42,7 @@ const MOCKS: Record<string, (user: string) => unknown> = {
       flashcards: nums.slice(0, 3).map((n) => ({ front: `Mock question about part ${n}?`, back: "A mock answer.", slide: n, module: "Mock module", topic: "Mock topic" })),
     };
   },
+  pictures: () => ({ pictures: [{ n: 1, useful: true, text: "Mock: a labelled diagram of a wave showing wavelength and amplitude." }] }),
   life_advice: () => ({ verdict: "go", reasons: ["Mock: you'd still get about 8.5 hours of sleep.", "Mock: it doesn't clash with any study."], alternatives: [] }),
   deck_final: () => ({ title: "Mock deck", subject: "Physics", module: "Kinematics", topic: "Motion", key_points: ["Mock key point one.", "Mock key point two."] }),
   report: () => ({ headline: "Mock briefing: nothing urgent today.", sections: [{ heading: "Today", points: ["Mock point."] }] }),

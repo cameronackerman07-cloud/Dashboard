@@ -43,11 +43,11 @@ export async function extractText(file: File): Promise<string> {
 
 // Text from a PDF, Word or text file already in memory (used for uploads that
 // went straight to Storage, up to 25 MB).
-export async function extractBytes(name: string, bytes: Uint8Array): Promise<string> {
+export async function extractBytes(name: string, bytes: Uint8Array, opts: { allowLittleText?: boolean } = {}): Promise<string> {
   if (bytes.length === 0) throw new ExtractError("That file is empty.");
   const kind = kindOf(name, bytes);
 
-  if (kind === "image") throw new ExtractError("Photos are coming later. For now, upload a PowerPoint (.pptx), PDF, Word (.docx), .txt or .md file.");
+  if (kind === "image") throw new ExtractError("Upload photos with the file uploader on Summaries, so their pictures can be read.");
   if (!kind) throw new ExtractError("That type of file isn't supported. Upload a PowerPoint (.pptx), PDF, Word (.docx), .txt or .md file.");
 
   let text = "";
@@ -71,10 +71,12 @@ export async function extractBytes(name: string, bytes: Uint8Array): Promise<str
   }
 
   const clean = tidy(text);
+  // Uploads whose pictures will be read (scans, diagrams) can have little text.
+  if (clean.length < 40 && opts.allowLittleText) return clean;
   if (clean.length < 40) {
     if (kind === "pdf") {
       throw new ExtractError(
-        "This PDF has no text to read. It's probably a scan or photos of pages. Photos are coming later; for now, upload a PDF with selectable text.",
+        "This PDF has no text to read. It's probably a scan: upload it with the file uploader on Summaries, which reads the pages as pictures.",
       );
     }
     throw new ExtractError("There isn't enough text in that file to summarise.");

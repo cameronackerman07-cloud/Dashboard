@@ -8,7 +8,7 @@ import type { Estimate } from "@/lib/upload-jobs";
 import { JobRunner } from "./JobRunner";
 import { prepareUploaded, requestUpload, startSummary } from "./upload-actions";
 
-const ACCEPT = ".pptx,.ppsx,.pdf,.docx,.txt,.md,.markdown";
+const ACCEPT = ".pptx,.ppsx,.pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,.webp,.heic,.heif,image/*";
 
 // Sends the file straight to Supabase Storage with a progress bar (never
 // through Vercel), then reads it on the server and shows how many AI calls
@@ -144,11 +144,16 @@ export function DirectUpload() {
           </p>
           {stage.estimate.lowText.length ? (
             <p className="card-meta">
-              Skipped slide{stage.estimate.lowText.length === 1 ? "" : "s"} {stage.estimate.lowText.join(", ")}: they&apos;re mostly pictures, and photos and diagrams aren&apos;t read yet.
+              Skipped slide{stage.estimate.lowText.length === 1 ? "" : "s"} {stage.estimate.lowText.join(", ")}: no text and no pictures the AI can read.
             </p>
           ) : null}
           {stage.estimate.hidden.length ? <p className="card-meta">Hidden slides included: {stage.estimate.hidden.join(", ")}.</p> : null}
-          {stage.estimate.charts ? <p className="card-meta">{stage.estimate.charts} chart{stage.estimate.charts === 1 ? "" : "s"} skipped (charts aren&apos;t read yet).</p> : null}
+          {stage.estimate.charts ? <p className="card-meta">{stage.estimate.charts} chart{stage.estimate.charts === 1 ? "" : "s"} read, with their real numbers (no AI needed).</p> : null}
+          {stage.estimate.picturesToRead ? (
+            <p className="card-meta">
+              {stage.estimate.picturesToRead} picture{stage.estimate.picturesToRead === 1 ? "" : "s"} (diagrams, graphs, photos, scanned pages) will be read by a vision AI, using {stage.estimate.pictureCalls} of those calls. Logos and tiny icons are skipped. Each picture is deleted as soon as it&apos;s read; only its text is kept. Reading pictures needs a Gemini key.
+            </p>
+          ) : null}
           {stage.estimate.aiCalls > stage.budget ? (
             <p className="ai-error" role="alert">
               That&apos;s more than you have left today. Use Quick mode, raise your daily allowance in Settings → AI keys, or finish tomorrow: the progress is kept.

@@ -496,6 +496,7 @@ export async function callAI<T = string>(args: {
   model?: string;
   temperature?: number;
   budgetMs?: number;
+  needsVision?: boolean;
 }): Promise<{ value: T; result: AiResult }> {
   const { messages, json, ...opts } = args;
   if (json) return aiJson(messages, json, opts);

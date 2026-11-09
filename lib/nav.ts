@@ -204,7 +204,7 @@ export const NAV: NavGroup[] = [
         phase: 3,
         built: true,
         plans: [
-          "Upload a PDF, Word, .txt or .md file (photos coming later)",
+          "Upload a PowerPoint, PDF, Word file or a photo: pictures and charts are read too",
           "Get a summary with key points, filed under the right subject",
           "Flashcards are made automatically, skipping ones you already have",
         ],

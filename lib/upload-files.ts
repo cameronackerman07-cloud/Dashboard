@@ -1,9 +1,9 @@
 // Upload rules shared by the browser and the server (no "server-only").
 
 export const MAX_DIRECT_UPLOAD_BYTES = 25 * 1024 * 1024;
-export type UploadKind = "pdf" | "docx" | "pptx" | "txt" | "md";
+export type UploadKind = "pdf" | "docx" | "pptx" | "txt" | "md" | "image";
 
-const OK: Record<string, UploadKind> = { pptx: "pptx", ppsx: "pptx", pdf: "pdf", docx: "docx", txt: "txt", md: "md", markdown: "md" };
+const OK: Record<string, UploadKind> = { pptx: "pptx", ppsx: "pptx", pdf: "pdf", docx: "docx", txt: "txt", md: "md", markdown: "md", png: "image", jpg: "image", jpeg: "image", webp: "image", heic: "image", heif: "image" };
 
 const REJECT: Record<string, string> = {
   ppt: "That's an old PowerPoint file (.ppt). Open it in PowerPoint, Keynote or Google Slides and save or export it as .pptx, then upload that.",
@@ -22,8 +22,8 @@ export function uploadKind(name: string): { kind: UploadKind } | { error: string
   const ext = name.toLowerCase().split(".").pop() ?? "";
   if (OK[ext]) return { kind: OK[ext] };
   if (REJECT[ext]) return { error: REJECT[ext] };
-  if (["png", "jpg", "jpeg", "heic", "heif", "webp", "gif"].includes(ext)) return { error: "Photos are coming later. Upload a PowerPoint (.pptx), PDF, Word (.docx), .txt or .md file." };
-  return { error: "That type of file isn't supported. Upload a PowerPoint (.pptx), PDF, Word (.docx), .txt or .md file." };
+  if (ext === "gif") return { error: "GIFs can't be read. Save it as a PNG or JPG and upload that." };
+  return { error: "That type of file isn't supported. Upload a PowerPoint (.pptx), PDF, Word (.docx), a photo (JPG, PNG, HEIC), .txt or .md file." };
 }
 
 // A storage-safe file name: letters, numbers, dot, dash and underscore only.

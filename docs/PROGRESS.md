@@ -19,7 +19,7 @@ Update this after every stage. A new session continues from the first unchecked 
   - Part 3 done: lib/money-ideas.ts (situation, 13-idea starter catalogue with age/legal notes and official links, no pay rates quoted — jobs say "check the current rate" + Fair Work; service estimates use your own price as a stated assumption; scoring; banned-idea filter; strict AI idea parser); opportunities agent (daily 09:00 re-rank, ≤3 AI ideas a week labelled verify, Saturday-run strategy report + push); ctx.ideas (only writes money_ideas, never status); /money-ideas page (situation, ranked cards, Interested/Trying/Not for me, log hours + optional income entry, Find more like this, Build/Re-rank). Not done: Adzuna jobs API, reading job RSS/web sources, fetching Fair Work pages for live rates, assistant `research_topic` action.
 - [x] Stage L — About me: profile_facts/writing_samples/profile_settings in agents.sql; lib/about-me.ts (sensitive-topic filter, writing-style stats, behaviour facts, questionnaire → confirmed facts, styleGuide), lib/about-me-server.ts (getProfileContext from confirmed facts only; analyseProfile: computed facts + opt-in AI pass on include_in_ai samples, all "suggested", rejected never re-added); about_me agent (Sunday 17:00 → "N new things to review"); /profile page (questionnaire, opt-in switches default off, review/confirm/edit/reject/delete, samples, style stats, Download my data via /api/profile/export, Forget everything); style guide feeds the assistant and The BRIAN headlines. Tests added (37 pass).
 - [x] Housekeeping — env.example, nav, icons, CLAUDE.md, README, ADDING_AN_AGENT.md, tests, viewport checks, final summary for Cameron
-  - Done so far: .env.example (AGENT_SECRET with how to make it, SMS names), nav (Coach, Money ideas, About me), icons (already there), CLAUDE.md Agents section, README (scheduler, late runs, pg_cron alternative, tests), ADDING_AN_AGENT.md (built-ins, what ctx may write). Tests done: tests/security.test.ts (safe-fetch private addresses incl. hex IPv4-mapped IPv6 — fixed in lib/safe-fetch.ts, OAuth state/return/PKCE, device-token hashing, secret tables have RLS + no policies + revoked grants, every table has RLS, no client code touches secret tables) and tests/tick.test.ts (in-memory tests/fake-db.ts, AI_MOCK, push stubbed via TEST_STUB_PUSH: deadlines clash → finding → The BRIAN alert + briefing → 2 pushes); 46 tests pass. Settings → "Your week" card added (pay-week start + weather town). Viewport checks NOT done: with no Supabase keys in this build every signed-in page shows the "not connected" screen, so they need a check on the live site (see Steps for Cameron, step 10).
+  - Done so far: .env.example (AGENT_SECRET with how to make it, SMS names), nav (Coach, Money ideas, About me), icons (already there), CLAUDE.md Agents section, README (scheduler, late runs, pg_cron alternative, tests), ADDING_AN_AGENT.md (built-ins, what ctx may write). Tests done: tests/security.test.ts (safe-fetch private addresses incl. hex IPv4-mapped IPv6 — fixed in lib/safe-fetch.ts, OAuth state/return/PKCE, device-token hashing, secret tables have RLS + no policies + revoked grants, every table has RLS, no client code touches secret tables) and tests/tick.test.ts (in-memory tests/fake-db.ts, AI_MOCK, push stubbed via TEST_STUB_PUSH: deadlines clash → finding → The BRIAN alert + briefing → 2 pushes); 46 tests pass. Settings → "Your week" card added (pay-week start + weather town). Viewport checks NOT done: with no Supabase keys in this build every signed-in page shows the "not connected" screen, so they need a check on the live site (hand test on the live site).
 
 ## Phase 6 (timer, HSC countdown, PowerPoint, My life, voice) — prompt pasted 9 Nov 2026
 
@@ -31,15 +31,15 @@ Update this after every stage. A new session continues from the first unchecked 
 - [x] Stage Q — components/VoiceButton.tsx (floating mic ≥56 px on every page, tap or hold, AnalyserNode meter, 60 s auto-stop, fresh MediaRecorder each time, tracks stopped after, first-use notice, permission help, https check, Alt+Shift+M, desktop Web Speech fallback when no Groq key), /api/voice/transcribe + lib/voice.ts (Groq whisper-large-v3-turbo, 5 MB/60 s, vocab hint, 30 clips/hour via voice_clips timestamps, 429 "resting", audio never stored), lib/assistant/intents.ts fast paths + app/(app)/voice-actions.ts (due, today, next shift, study hours, HSC, cleaning hours, timer start/stop/pause, open page), components/speech.ts (en-AU voice, speak replies, speed, stop, tap to hear), assistant voice hint + mic in the Ask box + voice:ask; tests/voice.test.ts.
 - [x] Housekeeping — phase6.sql tested on PGlite (runs twice, RLS on every table, one open timer, storage folder policies, cross-user upload_slides blocked); nav (Timer, Key dates, My life) + icons; Spotify not-allowed (403) message and plain Settings copy; README (phase 6 setup, per-minute pg_cron timer sweep SQL, tests); CLAUDE.md Phase 6 section; 83 tests pass; build passes with no env vars. Viewport checks NOT automated (no database in the build copy, and signing in to the real account isn't allowed) — see the hand-test list below.
 
-### Phase 6: steps for Cameron
-1. Supabase → SQL Editor → paste all of `supabase/phase6.sql` → Run. Then Storage → you should see a bucket called `uploads` marked Private. Storage → Policies (or Authentication → Policies, storage.objects) should list "uploads bucket: read own / add own / change own / delete own". If the bucket isn't there, Storage → New bucket → name `uploads`, Public off, file size limit 25 MB, then run phase6.sql again for the policies.
-2. Voice: Settings → AI keys → add a free Groq key (console.groq.com → API Keys). On iPhone, open the Home Screen app, tap the round mic button (bottom right), allow the microphone, say "what's due", tap the mic again. If you said no to the microphone: Settings → Apps → Safari → Microphone → Ask, then close and reopen the app.
-3. Optional on-time timer alerts: README → "Study timer alerts on time" has the SQL (pg_cron + pg_net, every minute). Skip it and the "Time's up" push can arrive up to ~30 minutes late when the app is closed; the time studied is still counted exactly.
-4. On or after Friday 30 April 2027: open Key dates → Add my exam dates, copy each exam's date and time from NESA Students Online, Save. Home then shows "Your first exam". The official dates come from lib/hsc-dates.ts (NSW Government HSC key dates page, checked 9 Nov 2026); a weekly check tells you in Inbox if that page changes.
-5. My life → Preferences: sleep target (8–10 h), school-day wake-up, wind-down, exercise sessions, social hours, downtime, study limits. Add your regular training/gym/sport as "Every week" plans with travel times and importance (5 = must keep, Fixed if it can't move).
-6. Spotify: you (the owner) need Premium; at most 5 people; add each friend's Spotify email in developer.spotify.com/dashboard → your app → User Management before they connect.
-7. Hand tests (iPhone 390 px, iPad 820×1180 and 1180×820, MacBook 1440×900): Home (HSC card), Timer (start 1 min, lock the phone, wait for the push), Summaries (upload a .pptx), My life (quick add "Gym Tue and Thu 6pm for 1 hour", Should I go?), the mic button on each page. Tell Claude about anything cut off, needing sideways scrolling, or hard to tap.
+## Phase 7 (requests of 9 Nov 2026)
 
+- [x] Cameron's setup steps for phases 1–6 are done, so the old "Steps for Cameron" lists were removed.
+- [x] Timer "Couldn't start": the exact insert works on real Postgres (PGlite), so the live failure is a database/API setup problem. The error now says the reason in plain words (missing table/column, permissions, schema cache) and logs the code; phase7.sql ends with `notify pgrst, 'reload schema'`.
+- [x] Sign-up: email + password only (no invite code, name optional); INVITE_CODE is no longer read.
+- [x] Year and subjects: profiles.year_level (7–12) + profiles.subjects (phase7.sql); /welcome after sign-up (and for anyone who hasn't picked) with Years 7–10 core subjects ticked and NESA electives grouped by learning area (lib/junior-subjects.ts, from curriculum.nsw.edu.au, Nov 2026), Stage 6 list for Years 11–12; Settings → Year and subjects; every subject picker, the planner, coach, key dates, assistant and voice now use your own subjects (lib/my-subjects.ts) instead of the fixed COURSES list. HSC countdown on Home only for Years 11–12.
+- [x] Advisor: says plainly what it recommends ("My advice: go / go but leave earlier / move one thing / I'd skip this one"); the student still makes the call.
+- [x] Pictures and charts: charts in PowerPoint and Word are read from the file's own chart data (real numbers, no AI); pictures in PowerPoint, Word and PDF (including scanned pages) and photo uploads (JPG/PNG/WebP/HEIC) are read by a vision AI, 4 per call, as job steps before summarising; logos (the same picture on 3+ slides), icons and EMF/WMF/SVG are skipped; each picture is deleted from Storage as soon as it's read. Needs a Gemini key (or another vision model); without one the pictures are skipped and the text is still summarised.
+- [x] Tests: tests/pictures.test.ts, tests/subjects.test.ts (97 pass); phase7.sql checked on PGlite.
 
 ## How to build here
 The repo is in iCloud and its node_modules folder is empty. Build in a scratch copy:
@@ -48,48 +48,6 @@ Git in the iCloud folder is slow: run commits and pushes in the Terminal panel (
 
 ## Notes
 - The scheduler workflow lives at docs/github/agents-tick.yml: Cameron must create .github/workflows/agents-tick.yml in GitHub's website (the local token can't push workflow files).
-- IMPORTANT for Cameron: AI now uses each person's own keys. Site (Vercel) keys only work for OWNER_EMAIL, so set OWNER_EMAIL to his email in Vercel (or add his own key in Settings → AI keys).
+- IMPORTANT for Cameron: AI now uses each person's own keys. Site (Vercel) keys only work for OWNER_EMAIL, so set OWNER_EMAIL to the owner's email in Vercel (or add their own key in Settings → AI keys).
 - Real SMS (lib/sms.ts) is a stub that stays off even with SMS_ENABLED set: it needs phone verification + encrypted number + caps before it can be switched on, and every Australian SMS provider charges per message and needs sender registration. The free route is the iPhone Shortcut automation (Settings → iPhone & Siri).
 - New tables for Stage K (assessments, study_guides, money_ideas, money_idea_log) are in supabase/agents.sql — Cameron must re-run that file in Supabase.
-
-## Steps for Cameron
-
-Everything in the spec is built. These are the things only you can do, in order. Your site address is shown below as `https://YOUR-SITE.vercel.app`: swap in your real Vercel address.
-
-1. **Run the database file.** Open supabase.com → your project → **SQL Editor** → **New query**. Open `supabase/schema.sql` in this repo, copy all of it, paste it in, press **Run**. Then do the same with `supabase/agents.sql`. Both are safe to run again; run `agents.sql` again whenever it changes.
-
-2. **Make the secrets and put them in Vercel.** In a terminal, in the `dashboard` folder:
-   - `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` gives you `TOKEN_ENCRYPTION_KEY`. **Save a copy in a password manager.** If you lose it, every saved AI key and connection becomes unreadable and everyone has to add them again.
-   - `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` gives you `AGENT_SECRET`.
-   - `npm run vapid` prints `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`.
-   - Go to Vercel → your project → **Settings → Environment Variables** and add: `TOKEN_ENCRYPTION_KEY`, `AGENT_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:` followed by your email), `SITE_URL` (`https://YOUR-SITE.vercel.app`, no slash at the end), `OWNER_EMAIL` (the email you sign in with), `SHARED_AI_FOR_FRIENDS` (`off`), `INVITE_CODE` (a word only your friends know), plus the Google and Spotify values from steps 3 and 4. Don't add `AI_MOCK` in Vercel.
-   - Then **Deployments → ⋯ on the newest one → Redeploy**, so the site picks the new values up.
-
-3. **Google.** Go to console.cloud.google.com → APIs & Services → **Credentials** → your OAuth client. Under **Authorised redirect URIs** add `https://YOUR-SITE.vercel.app/api/google/callback` and `http://localhost:3000/api/google/callback`. Copy the Client ID and secret into Vercel as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. On **OAuth consent screen**, set it to **In production**. If you leave it on "Testing", connections stop working after 7 days. Google will say the app is "unverified". That's fine for you and a few friends: on the warning, tap **Advanced → Go to (site name)**. Your school's Google account might be blocked by the school. If it is, share your school calendar to your personal Google account and connect that one instead.
-
-4. **Spotify.** Go to developer.spotify.com/dashboard → **Create app**. Pick **Web API**. Add the redirect URIs `https://YOUR-SITE.vercel.app/api/spotify/callback` and `http://127.0.0.1:3000/api/spotify/callback` (Spotify won't accept "localhost"). Put the Client ID and secret in Vercel as `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`. Spotify's current rules for apps in development mode: you (the owner) need Spotify **Premium**, at most **5** people can use it, and you must add each friend's Spotify email under the app's **User Management** before they connect.
-
-5. **Turn on the 30-minute scheduler (GitHub).**
-   - On github.com open your Dashboard repo → **Settings → Secrets and variables → Actions → New repository secret**. Add `SITE_URL` (same as in Vercel) and `AGENT_SECRET` (the same value as in Vercel).
-   - Then click **Add file → Create new file**, name it `.github/workflows/agents-tick.yml`, paste in everything from `docs/github/agents-tick.yml`, and **Commit**.
-   - To check it ran: open the **Actions** tab. You should see "agents-tick" runs with green ticks, and AI Agents in the dashboard shows "last run" times. GitHub can start runs 5–30 minutes late.
-
-6. **Set up your iPhone.**
-   - Open the site in **Safari** → Share → **Add to Home Screen**, then open it from the new icon.
-   - In the app, go to Settings → **Notifications** → **Turn on**, allow notifications, then press **Send a test**.
-   - Go to Settings → **iPhone & Siri** → **Create a token**. Copy it right away; it's only shown once.
-   - Build the Shortcuts by following the recipes on that page. For the **Wednesday text**: Shortcuts app → Automation → New → Time of Day → Wednesday 7:00 → run the "cleaner hours" recipe → Send Message → turn off "Ask before running".
-   - **Apple Calendar:** on that same page, tap the webcal link on your iPhone and iPad, or scan the QR code. On your MacBook, open Calendar → File → New Calendar Subscription and paste the link.
-
-7. **What to send a friend:** the site link, your invite code, and this: "Make an account, then go to Settings → AI keys and add your own free key. Gemini at aistudio.google.com or Groq at console.groq.com are easiest." For Spotify, also ask for their Spotify email and add it as in step 4.
-
-8. **Fill in your own details in the app:**
-   - Settings → **Your week**: pay-week start day and your town (for the weather).
-   - **Shifts** → edit the cleaning job and tick **Weekly hours report**.
-   - **Coach**: your ATAR target, target marks per course, and key dates and assessments.
-   - **Money ideas**: your situation (age, town, hours free, skills, transport, budget, goal).
-   - **About me**: the questions. Learning switches stay off unless you turn them on.
-
-9. **Honest limits.** Scheduled runs can be late, so use the Shortcuts automation when a text has to go at an exact time. Real SMS is off and would cost money per message. Free AI quotas belong to each person's own account. iPhone notifications only work from the installed Home Screen app. Earnings and ATAR figures are estimates, not promises. Scheduled agents only read and report. They never send, buy, apply for or change anything.
-
-10. **Quick look on your devices.** After step 2, sign in on your iPhone, iPad and MacBook. Open Home, Inbox, AI Agents, Calendar, Planner, Pay, Coach, Money ideas, About me and each Settings page. Tell Claude about anything that's cut off, needs sideways scrolling, or is hard to tap. This couldn't be checked automatically, because the test copy has no database keys.
