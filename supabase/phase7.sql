@@ -4,6 +4,23 @@
 -- Safe to run again. Needs schema.sql (the profiles table) first.
 -- Profiles already have Row Level Security: each person can only read and change their own.
 
+-- Stop with a plain message if an earlier file hasn't been run yet.
+do $$
+begin
+  if to_regclass('public.profiles') is null then
+    raise exception 'Run supabase/schema.sql first, then agents.sql, then phase6.sql, then this file.';
+  end if;
+  if to_regclass('public.user_settings') is null then
+    raise exception 'Run supabase/agents.sql first, then phase6.sql, then this file.';
+  end if;
+  if to_regclass('public.study_sessions') is null
+     or not exists (select 1 from information_schema.columns
+                    where table_schema = 'public' and table_name = 'uploads' and column_name = 'kind') then
+    raise exception 'Run supabase/phase6.sql first (it adds the study timer and big uploads), then run this file again.';
+  end if;
+end
+$$;
+
 alter table public.profiles add column if not exists year_level smallint;
 alter table public.profiles add column if not exists subjects text[] not null default '{}';
 

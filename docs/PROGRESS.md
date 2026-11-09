@@ -40,6 +40,7 @@ Update this after every stage. A new session continues from the first unchecked 
 - [x] Advisor: says plainly what it recommends ("My advice: go / go but leave earlier / move one thing / I'd skip this one"); the student still makes the call.
 - [x] Pictures and charts: charts in PowerPoint and Word are read from the file's own chart data (real numbers, no AI); pictures in PowerPoint, Word and PDF (including scanned pages) and photo uploads (JPG/PNG/WebP/HEIC) are read by a vision AI, 4 per call, as job steps before summarising; logos (the same picture on 3+ slides), icons and EMF/WMF/SVG are skipped; each picture is deleted from Storage as soon as it's read. Needs a Gemini key (or another vision model); without one the pictures are skipped and the text is still summarised.
 - [x] Tests: tests/pictures.test.ts, tests/subjects.test.ts (97 pass); phase7.sql checked on PGlite.
+- [x] phase7.sql now stops with a plain message if schema.sql, agents.sql or phase6.sql hasn't been run (the live database was missing phase6.sql, which is also why the timer failed).
 
 ## How to build here
 The repo is in iCloud and its node_modules folder is empty. Build in a scratch copy:
