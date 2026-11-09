@@ -2,24 +2,28 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
 import { getCalendarConnections, loadEvents } from "@/lib/calendar";
+import { isView, VIEWS, viewRange, type CalView } from "@/lib/calendar-edit";
 import { CAL_SOURCES, collectItems, type CalItem, type CalSource } from "@/lib/calendar-merge";
 import { googleEvents } from "@/lib/sources/google";
 import { createClient, currentUserId } from "@/lib/supabase/server";
-import { addDays, dayKey, formatDayKey, formatDayKeyLong, formatTime, isDayKey, mondayOf, sydneyInstant } from "@/lib/time";
+import { addDays, dayKey, isDayKey, sydneyInstant } from "@/lib/time";
+import { CalendarClient, type ShownItem } from "./CalendarClient";
 
 export const metadata: Metadata = { title: "Calendar" };
 
-type Props = { searchParams: Promise<{ view?: string; w?: string; hide?: string }> };
+// ?view=day|week|month|agenda  &d=YYYY-MM-DD (the day to show)  &hide=sources
+// (`w` is the old week link and still works.)
+type Props = { searchParams: Promise<{ view?: string; d?: string; w?: string; hide?: string }> };
 
 export default async function CalendarPage({ searchParams }: Props) {
   const params = await searchParams;
-  const view = params.view === "agenda" ? "agenda" : "week";
+  const view: CalView = isView(params.view) ? params.view : "week";
   const today = dayKey(Date.now());
-  const start = view === "week" ? mondayOf(isDayKey(params.w) ? params.w : today) : today;
-  const days = Array.from({ length: view === "week" ? 7 : 14 }, (_, i) => addDays(start, i));
-  const from = sydneyInstant(days[0]);
-  const to = sydneyInstant(addDays(days[days.length - 1], 1));
-  const hidden = new Set((params.hide ?? "").split(",").filter(Boolean));
+  const anchor = isDayKey(params.d) ? params.d : isDayKey(params.w) ? params.w : today;
+  const range = viewRange(view, anchor);
+  const from = sydneyInstant(range.days[0]);
+  const to = sydneyInstant(addDays(range.days[range.days.length - 1], 1));
+  const hidden = new Set((params.hide ?? "").split(",").filter((s) => CAL_SOURCES.some((c) => c.id === s)));
 
   const userId = await currentUserId();
   const supabase = await createClient();
@@ -30,17 +34,23 @@ export default async function CalendarPage({ searchParams }: Props) {
     userId ? googleEvents(userId).catch(() => []) : Promise.resolve([]),
   ]);
 
-  const all: CalItem[] = [
-    ...events.map((e) => ({ id: `cal-${e.id}`, title: e.title, start: e.start, end: e.end, allDay: e.allDay, source: "class" as CalSource, label: "School calendar", location: e.location })),
+  const all: ShownItem[] = [
+    ...events.map((e) =>
+      e.source === "mine"
+        ? { id: `mine-${e.id}`, eventId: e.id, title: e.title, start: e.start, end: e.end, allDay: e.allDay, source: "mine" as CalSource, label: "My event", location: e.location }
+        : { id: `cal-${e.id}`, title: e.title, start: e.start, end: e.end, allDay: e.allDay, source: "class" as CalSource, label: "School calendar", location: e.location },
+    ),
     ...google.filter((g) => g.start < to && g.end > from).map((g) => ({ id: `g-${g.id}`, title: g.title, start: g.start, end: g.end, allDay: g.allDay, source: "google" as CalSource, label: `Google · ${g.account}`, location: g.location })),
     ...mine,
   ].filter((i) => !hidden.has(i.source));
 
+  const hide = [...hidden].join(",") || undefined;
   const qs = (patch: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
-    const merged = { view, w: view === "week" ? start : undefined, hide: [...hidden].join(",") || undefined, ...patch };
+    const merged = { view, d: range.anchor === today ? undefined : range.anchor, hide, ...patch };
     for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
-    return `/calendar?${p}`;
+    const s = p.toString();
+    return s ? `/calendar?${s}` : "/calendar";
   };
   const toggle = (s: CalSource) => {
     const next = new Set(hidden);
@@ -48,8 +58,12 @@ export default async function CalendarPage({ searchParams }: Props) {
     else next.add(s);
     return qs({ hide: [...next].join(",") || undefined });
   };
+  // Switching views keeps you on the same day (or today, if it's on screen).
+  const keep = range.days.includes(today) ? undefined : range.days.includes(anchor) ? anchor : range.anchor;
+  const viewHrefs = Object.fromEntries(VIEWS.map((v) => [v.id, qs({ view: v.id, d: keep })])) as Record<CalView, string>;
+  const dayHrefs = Object.fromEntries(range.days.map((d) => [d, qs({ view: "day", d })]));
 
-  const byDay = days.map((d) => {
+  const byDay = range.days.map((d) => {
     const s = sydneyInstant(d);
     const e = sydneyInstant(addDays(d, 1));
     return { day: d, items: all.filter((i) => i.start < e && i.end > s).sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start - b.start) };
@@ -57,7 +71,7 @@ export default async function CalendarPage({ searchParams }: Props) {
 
   return (
     <main className="main">
-      <PageHeader icon="calendar" title="Calendar" lede="Google, your school calendar, shifts, due dates and study blocks together, in Sydney time." />
+      <PageHeader icon="calendar" title="Calendar" lede="Your own events, Google, your school calendar, shifts, due dates and study blocks together, in Sydney time." />
       {error ? (
         <p className="ai-error" role="alert">
           {error} <Link href="/settings">Check the link in Settings</Link>
@@ -65,70 +79,34 @@ export default async function CalendarPage({ searchParams }: Props) {
       ) : null}
       {connections.length === 0 && google.length === 0 ? (
         <div className="notice" role="note">
-          <span>Connect Google or your Sentral/Atlantis calendar in Settings to see classes and events here.</span>
+          <span>Add your own events here, or connect Google or your Sentral/Atlantis calendar in Settings to see classes and school events too.</span>
           <Link href="/settings" className="card-link">
             Connect →
           </Link>
         </div>
       ) : null}
 
-      <div className="cal-toolbar">
-        <nav className="seg" aria-label="View">
-          <Link className={`seg-btn seg-link${view === "week" ? " is-active" : ""}`} href={qs({ view: "week", w: start })}>
-            Week
-          </Link>
-          <Link className={`seg-btn seg-link${view === "agenda" ? " is-active" : ""}`} href={qs({ view: "agenda", w: undefined })}>
-            Agenda
-          </Link>
-        </nav>
-        {view === "week" ? (
-          <nav className="week-nav cal-weeknav" aria-label="Choose a week">
-            <Link className="btn btn-small" href={qs({ w: addDays(start, -7) })} aria-label="Previous week">
-              ←
-            </Link>
-            <strong>
-              {formatDayKey(start)} – {formatDayKey(addDays(start, 6))}
-            </strong>
-            <Link className="btn btn-small" href={qs({ w: addDays(start, 7) })} aria-label="Next week">
-              →
-            </Link>
-          </nav>
-        ) : null}
-      </div>
+      <CalendarClient
+        view={view}
+        days={byDay}
+        today={today}
+        month={range.month}
+        anchor={view === "week" || view === "month" ? range.anchor : anchor}
+        label={range.label}
+        prevHref={qs({ d: range.prev })}
+        nextHref={qs({ d: range.next })}
+        todayHref={qs({ d: undefined })}
+        viewHrefs={viewHrefs}
+        dayHrefs={dayHrefs}
+        goToBase={qs({ d: undefined })}
+      />
+
       <div className="idea-row" role="group" aria-label="Show sources">
         {CAL_SOURCES.map((s) => (
           <Link key={s.id} href={toggle(s.id)} className={`idea${hidden.has(s.id) ? "" : " is-on"}`} aria-pressed={!hidden.has(s.id)}>
             {s.label}
           </Link>
         ))}
-      </div>
-
-      <div className={view === "week" ? "cal-week" : "cal-agenda"}>
-        {byDay
-          .filter((d) => view === "week" || d.items.length > 0 || d.day === today)
-          .map((d) => (
-            <section key={d.day} className={`card cal-day${d.day === today ? " tt-today" : ""}`} aria-label={formatDayKeyLong(d.day)}>
-              <div className="card-head">
-                <h2 className="card-title">{view === "week" ? formatDayKey(d.day) : formatDayKeyLong(d.day)}</h2>
-                {d.day === today ? <span className="chip">TODAY</span> : null}
-              </div>
-              {d.items.length === 0 ? (
-                <p className="track-empty">Nothing on.</p>
-              ) : (
-                <div className="rows">
-                  {d.items.map((i) => (
-                    <div className="row cal-row" key={`${d.day}|${i.id}`}>
-                      <span className="row-slot cal-time">{i.allDay ? "All day" : formatTime(i.start)}</span>
-                      <span className="row-main cal-main">
-                        <span className="cal-title">{i.title}</span>
-                        <span className="task-sub">{[i.label, i.allDay ? null : `until ${formatTime(i.end)}`, i.location].filter(Boolean).join(" · ")}</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          ))}
       </div>
     </main>
   );

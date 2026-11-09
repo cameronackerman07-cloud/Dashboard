@@ -3,8 +3,8 @@ import { userForCalendarToken } from "@/lib/device-tokens";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { addDays, dayKey, sydneyInstant } from "@/lib/time";
 
-// Private, read-only .ics feed for Apple Calendar: shifts, due dates and study
-// blocks. The random token in the address is the only key, so it can be
+// Private, read-only .ics feed for Apple Calendar: your own events, shifts, due
+// dates and study blocks. The random token in the address is the only key, so it can be
 // regenerated in Settings. Apple refreshes subscriptions on its own schedule.
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   if (!userId) return new Response("Not found", { status: 404 });
 
   const today = dayKey(Date.now());
-  const items = await collectItems(createAdminClient(), userId, sydneyInstant(addDays(today, -14)), sydneyInstant(addDays(today, 60)));
+  const db = createAdminClient();
+  const from = sydneyInstant(addDays(today, -14));
+  const to = sydneyInstant(addDays(today, 60));
+  const [items, own] = await Promise.all([
+    collectItems(db, userId, from, to),
+    // Events you added on the Calendar page.
+    db.from("events").select("id, title, starts_at, ends_at, all_day").eq("user_id", userId).eq("source", "mine").lt("starts_at", new Date(to).toISOString()).gt("ends_at", new Date(from).toISOString()).limit(1000),
+  ]);
+  for (const e of (own.data ?? []) as { id: string; title: string | null; starts_at: string; ends_at: string; all_day: boolean }[]) {
+    items.push({ id: `mine-${e.id}`, title: e.title ?? "Event", start: new Date(e.starts_at).getTime(), end: new Date(e.ends_at).getTime(), allDay: e.all_day, source: "mine", label: "My event" });
+  }
   const now = stamp(Date.now());
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Dashboard//EN", "CALSCALE:GREGORIAN", "X-WR-CALNAME:Dashboard", "X-PUBLISHED-TTL:PT1H", "REFRESH-INTERVAL;VALUE=DURATION:PT1H"];
   for (const i of items) {

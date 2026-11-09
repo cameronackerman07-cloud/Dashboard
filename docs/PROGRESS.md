@@ -42,6 +42,12 @@ Update this after every stage. A new session continues from the first unchecked 
 - [x] Tests: tests/pictures.test.ts, tests/subjects.test.ts (97 pass); phase7.sql checked on PGlite.
 - [x] phase7.sql now stops with a plain message if schema.sql, agents.sql or phase6.sql hasn't been run (the live database was missing phase6.sql, which is also why the timer failed).
 
+## Calendar editing (10 Nov 2026)
+- [x] Add, edit and delete your own events (rows in `events` with source "mine"; no new SQL). School, Google, shift, due and study items open read-only with where to change them.
+- [x] Day / Week / Month / Agenda views, ←/Today/→ and a jump-to-date box (`?view=&d=`; old `?w=` links still work). Month view shows dots on phones.
+- [x] Own events also go to the Apple Calendar feed and count as busy time for the planner and My life (via loadEvents).
+- [x] tests/calendar.test.ts.
+
 ## How to build here
 The repo is in iCloud and its node_modules folder is empty. Build in a scratch copy:
 `rsync -a --delete --exclude node_modules --exclude .next --exclude .git --exclude .env.local <repo>/ <scratch>/app/`, then `npm ci` once in `<scratch>/app`, then `npx tsc --noEmit && npm run build` (no env vars). If you add packages, run `npm i` in the scratch copy and copy package.json + package-lock.json back.

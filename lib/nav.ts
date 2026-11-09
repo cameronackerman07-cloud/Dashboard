@@ -35,6 +35,8 @@ export const NAV: NavGroup[] = [
         phase: 1,
         built: true,
         plans: [
+          "Add, edit and delete your own events",
+          "Day, week, month and agenda views, with a jump-to-date box",
           "Merges your personal and school Google calendars",
           "Adds Canvas and Atlantis events from their calendar links",
           "Shows which account each event came from",

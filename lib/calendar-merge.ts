@@ -5,8 +5,9 @@ import { addDays, dayKey, sydneyInstant, weekdayOfKey } from "@/lib/time";
 // events and linked calendars. Used by /calendar and the Apple Calendar feed.
 // Every query names the user_id, so it's also safe with the service-role client.
 
-export type CalSource = "class" | "google" | "shift" | "due" | "study";
+export type CalSource = "mine" | "class" | "google" | "shift" | "due" | "study";
 export const CAL_SOURCES: { id: CalSource; label: string }[] = [
+  { id: "mine", label: "My events" },
   { id: "class", label: "Classes and school calendar" },
   { id: "google", label: "Google" },
   { id: "shift", label: "Shifts" },

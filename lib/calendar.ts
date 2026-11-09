@@ -27,7 +27,7 @@ export type CalEvent = {
   start: number;
   end: number;
   allDay: boolean;
-  source: "link" | "file" | "task";
+  source: "link" | "file" | "mine" | "task";
 };
 
 const MAX_BYTES = 3_000_000;
@@ -190,19 +190,20 @@ async function importedEvents(fromMs: number, toMs: number): Promise<CalEvent[]>
   const supabase = await createClient();
   const { data } = await supabase
     .from("events")
-    .select("id, title, location, starts_at, ends_at, all_day")
+    .select("id, title, location, starts_at, ends_at, all_day, source")
     .lt("starts_at", new Date(toMs).toISOString())
     .gt("ends_at", new Date(fromMs).toISOString())
     .order("starts_at", { ascending: true })
     .limit(2000);
-  return (data ?? []).map((e: { id: string; title: string | null; location: string | null; starts_at: string; ends_at: string; all_day: boolean }) => ({
+  return (data ?? []).map((e: { id: string; title: string | null; location: string | null; starts_at: string; ends_at: string; all_day: boolean; source: string | null }) => ({
     id: e.id,
     title: e.title ?? "Untitled",
     location: e.location,
     start: new Date(e.starts_at).getTime(),
     end: new Date(e.ends_at).getTime(),
     allDay: e.all_day,
-    source: "file" as const,
+    // Events you added yourself (Calendar → Add event) vs an imported file.
+    source: e.source === "mine" ? ("mine" as const) : ("file" as const),
   }));
 }
 
