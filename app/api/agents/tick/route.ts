@@ -3,6 +3,7 @@ import { runDueForUser, STOP_STARTING_AFTER_MS } from "@/lib/agents/engine";
 import { bearerMatches } from "@/lib/bearer";
 import { syncGoogle } from "@/lib/sources/google";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
+import { sweepTimers } from "@/lib/timer-sweep";
 
 // Called every 30 minutes by .github/workflows/agents-tick.yml (or Supabase
 // pg_cron) with "Authorization: Bearer <AGENT_SECRET>". Runs every due agent,
@@ -33,6 +34,9 @@ async function tick(request: Request) {
     .limit(5000);
   if (error) return NextResponse.json({ ok: false, error: "couldn't list agents" }, { status: 500 });
 
+  // Study timers first: "Time's up" pushes and closing forgotten sessions.
+  const timers = await sweepTimers(db, started).catch(() => ({ alerted: 0, closed: 0 }));
+
   const users: string[] = [...new Set<string>((data ?? []).map((r: { user_id: string }) => r.user_id))];
   const totals = { users: 0, agents: 0, errors: 0, left: 0 };
   for (const userId of users) {
@@ -56,7 +60,7 @@ async function tick(request: Request) {
     if (Date.now() - started > STOP_STARTING_AFTER_MS) break;
     synced += (await syncGoogle(userId, { olderThanMs: 25 * 60_000 }).catch(() => [])).length;
   }
-  Object.assign(totals, { googleSynced: synced });
+  Object.assign(totals, { googleSynced: synced, timersAlerted: timers.alerted, timersClosed: timers.closed });
   console.log(`Agents tick: ${JSON.stringify(totals)}`);
   return NextResponse.json({ ok: true, ...totals });
 }

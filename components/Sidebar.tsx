@@ -19,7 +19,7 @@ export function Sidebar({
   initials,
   userEmail = "",
 }: {
-  badges?: Record<string, number>;
+  badges?: Record<string, number | string>;
   displayName: string;
   initials: string;
   userEmail?: string;

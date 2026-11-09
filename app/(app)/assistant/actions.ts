@@ -6,7 +6,9 @@ import { AiError, aiJson, NO_KEY_MESSAGE } from "@/lib/ai";
 import { hasUsableKey } from "@/lib/ai-keys";
 import { sanitizeForAI } from "@/lib/agents/sanitize";
 import { applyAddBlock, applyAddNote, applyAddTodo, applyCreateFlashcards, applyLogHabit, applyStudyPlan, undoAction } from "@/lib/assistant/apply";
-import { ACTION_GUIDE, parseAction, parseAssistantReply, TINY_ACTIONS, type AssistantAction, type AssistantMode } from "@/lib/assistant/schema";
+import { ACTION_GUIDE, INSTANT_ACTIONS, parseAction, parseAssistantReply, TINY_ACTIONS, type AssistantAction, type AssistantMode } from "@/lib/assistant/schema";
+import { finishSession, pauseSession, startSession, studySummary } from "@/lib/study-sessions";
+import { hoursSpoken } from "@/lib/study-time";
 import { buildPlan, gatherFacts, savePlan } from "@/lib/budget-plan";
 import { isBudgetPlan, normalizePlan, planTotals, type BudgetPlan } from "@/lib/budget-plan-core";
 import { formatCents } from "@/lib/money";
@@ -33,6 +35,7 @@ export type Proposal = {
   agentId?: string;
   href?: string;
   unavailable?: string;
+  voice?: boolean;
 };
 
 export type Applied = { summary: string; ok: boolean; message: string; actionId: string | null };
@@ -103,6 +106,14 @@ async function prepare(userId: string, action: AssistantAction, agents: { id: st
     }
     case "open_page":
       return { key, action, tiny, href: `/${action.page}`, summary: `Open ${pageLabel(action.page)}.` };
+    case "start_study_timer":
+      return { key, action, tiny: true, summary: `Start a ${action.minutes}-minute ${action.subject} timer.` };
+    case "pause_study_timer":
+      return { key, action, tiny: true, summary: "Pause the study timer." };
+    case "stop_study_timer":
+      return { key, action, tiny: true, summary: "Finish and save the study timer." };
+    case "study_hours_summary":
+      return { key, action, tiny: true, summary: "Check your study hours." };
   }
 }
 
@@ -139,6 +150,25 @@ export async function applyProposal(p: Proposal): Promise<Applied> {
       if (!isUuid(p.agentId)) return { summary, ...SAVE_FAILED, actionId: null };
       res = await renameAgent(p.agentId, action.new_name);
       break;
+    case "start_study_timer": {
+      const userId = (await currentUserId())!;
+      res = await startSession(await createClient(), userId, { minutes: action.minutes, subject: action.subject, topic: action.topic, source: p.voice ? "voice" : "timer" });
+      revalidatePath("/timer");
+      break;
+    }
+    case "pause_study_timer":
+      res = await pauseSession(await createClient(), (await currentUserId())!);
+      revalidatePath("/timer");
+      break;
+    case "stop_study_timer":
+      res = await finishSession(await createClient(), (await currentUserId())!);
+      revalidatePath("/timer");
+      break;
+    case "study_hours_summary": {
+      const s = await studySummary(await createClient(), (await currentUserId())!);
+      res = { ok: true, message: s.total ? `Today ${hoursSpoken(s.today)}. This week ${hoursSpoken(s.week)}. ${hoursSpoken(s.total)} in total.` : s.text };
+      break;
+    }
     default:
       // run_agent and open_page happen in the browser; the rest aren't ready yet.
       return { summary, ok: false, message: "That can't be done from here yet.", actionId: null };
@@ -192,7 +222,7 @@ export async function setAskBeforeChanges(on: boolean): Promise<Reply> {
   return { ok: true, message: on ? "I'll ask before changing anything." : "Small things (one to-do, one habit tick) will now happen straight away." };
 }
 
-export async function askAssistant(message: string, history: Turn[], model?: string): Promise<AskReply> {
+export async function askAssistant(message: string, history: Turn[], model?: string, opts?: { voice?: boolean }): Promise<AskReply> {
   const userId = await currentUserId();
   if (!userId) return SIGNED_OUT;
   const text = String(message ?? "").trim().slice(0, 4000);
@@ -223,7 +253,7 @@ Pick ONE mode from the student's message:
 ${ACTION_GUIDE}
 Their subjects: ${COURSES.join(", ")}. Agents: ${agentList.map((a) => a.name).join(", ") || "none"}. Habits: ${((habits ?? []) as { name: string }[]).map((h) => h.name).join(", ") || "none"}. Pages: ${PAGES.join(", ")}.
 For a study plan just use create_study_plan; never work out times yourself. Never ask for or repeat passwords, keys, tokens or phone numbers.
-Reply with ONLY JSON: {"mode": "tutor"|"chat"|"action", "reply": string (plain text, short paragraphs), "actions": [ ... ]}. "actions" is [] unless mode is "action".${style ? `\n${style} Use this only to tune your tone.` : ""}`;
+Reply with ONLY JSON: {"mode": "tutor"|"chat"|"action", "reply": string (plain text, short paragraphs), "actions": [ ... ]}. "actions" is [] unless mode is "action".${opts?.voice ? "\nThis came from voice and your reply will be read aloud: reply in one to three short spoken sentences, no markdown or lists, and say numbers naturally." : ""}${style ? `\n${style} Use this only to tune your tone.` : ""}`;
 
   let parsed;
   let modelLabel = "";
@@ -249,9 +279,13 @@ Reply with ONLY JSON: {"mode": "tutor"|"chat"|"action", "reply": string (plain t
     return { ok: true, message: "", mode: parsed.mode, reply: `${parsed.reply}\n\n(I couldn't get those changes ready. Try again.)`, proposals: [], model: modelLabel };
   }
 
+  // Timer actions and read-only answers always happen now.
+  const applied: Applied[] = [];
+  for (const p of proposals.filter((x) => INSTANT_ACTIONS.has(x.action.type))) applied.push(await applyProposal({ ...p, voice: !!opts?.voice }));
+  proposals = proposals.filter((x) => !INSTANT_ACTIONS.has(x.action.type));
+
   // "Ask before changing things" off: tiny, ready actions happen now.
   const askFirst = settings?.ask_before_changes !== false;
-  const applied: Applied[] = [];
   if (!askFirst) {
     for (const p of proposals.filter((x) => x.tiny && !x.unavailable && x.action.type !== "open_page")) {
       applied.push(await applyProposal(p));

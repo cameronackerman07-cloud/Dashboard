@@ -13,7 +13,9 @@ export type SourceId =
   | "assessments"
   | "notes"
   | "profile_confirmed"
-  | "web_sources";
+  | "web_sources"
+  | "study_time"
+  | "key_dates";
 
 export const SOURCES: { id: SourceId; label: string; sensitive?: boolean }[] = [
   { id: "assignments", label: "Assignments and due dates" },
@@ -27,7 +29,12 @@ export const SOURCES: { id: SourceId; label: string; sensitive?: boolean }[] = [
   { id: "notes", label: "Notes", sensitive: true },
   { id: "profile_confirmed", label: "About me (confirmed facts only)" },
   { id: "web_sources", label: "Web pages and RSS feeds you add" },
+  { id: "study_time", label: "Study timer totals (hours only)" },
+  { id: "key_dates", label: "Your key dates and the HSC countdown" },
 ];
+
+// Totals-only sources every agent may read without ticking them.
+export const ALWAYS_SOURCES = new Set<SourceId>(["study_time", "key_dates"]);
 
 export type Finding = {
   category: string;

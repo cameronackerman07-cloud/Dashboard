@@ -21,6 +21,16 @@ Update this after every stage. A new session continues from the first unchecked 
 - [x] Housekeeping — env.example, nav, icons, CLAUDE.md, README, ADDING_AN_AGENT.md, tests, viewport checks, final summary for Cameron
   - Done so far: .env.example (AGENT_SECRET with how to make it, SMS names), nav (Coach, Money ideas, About me), icons (already there), CLAUDE.md Agents section, README (scheduler, late runs, pg_cron alternative, tests), ADDING_AN_AGENT.md (built-ins, what ctx may write). Tests done: tests/security.test.ts (safe-fetch private addresses incl. hex IPv4-mapped IPv6 — fixed in lib/safe-fetch.ts, OAuth state/return/PKCE, device-token hashing, secret tables have RLS + no policies + revoked grants, every table has RLS, no client code touches secret tables) and tests/tick.test.ts (in-memory tests/fake-db.ts, AI_MOCK, push stubbed via TEST_STUB_PUSH: deadlines clash → finding → The BRIAN alert + briefing → 2 pushes); 46 tests pass. Settings → "Your week" card added (pay-week start + weather town). Viewport checks NOT done: with no Supabase keys in this build every signed-in page shows the "not connected" screen, so they need a check on the live site (see Steps for Cameron, step 10).
 
+## Phase 6 (timer, HSC countdown, PowerPoint, My life, voice) — prompt pasted 9 Nov 2026
+
+- [x] Checked prerequisites — login/RLS, lib/ai.ts per-user keys, sanitizeForAI, redactSecrets, safe-fetch, agents + The BRIAN, assistant confirm/undo, planner, Summaries/Flashcards, subjects, device tokens, push all exist.
+- [x] Stage M — study timer: supabase/phase6.sql (study_sessions with one-open-session index, study_settings), lib/study-time.ts (timestamp maths, grace/auto-close, midnight split, streaks, projection), lib/study-sessions.ts, /timer (ring, presets, Pomodoro, wake lock, offline Finish queue, stats, heatmap, history, manual entry), /timer/journey + /api/timer/export, TimerChip, /api/timer/sweep + tick, Siri study endpoints, assistant timer actions, planner "Start timer", BRIAN/coach/deadlines use study_time.
+- [ ] Stage N — HSC countdown on Home + key dates
+- [ ] Stage O — PowerPoint and direct-to-Storage uploads
+- [ ] Stage P — My life planner and "Should I go?"
+- [ ] Stage Q — voice
+- [ ] Housekeeping — docs, viewport checks, final steps for Cameron
+
 ## How to build here
 The repo is in iCloud and its node_modules folder is empty. Build in a scratch copy:
 `rsync -a --delete --exclude node_modules --exclude .next --exclude .git --exclude .env.local <repo>/ <scratch>/app/`, then `npm ci` once in `<scratch>/app`, then `npx tsc --noEmit && npm run build` (no env vars). If you add packages, run `npm i` in the scratch copy and copy package.json + package-lock.json back.
@@ -42,7 +52,7 @@ Everything in the spec is built. These are the things only you can do, in order.
    - `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` gives you `TOKEN_ENCRYPTION_KEY`. **Save a copy in a password manager.** If you lose it, every saved AI key and connection becomes unreadable and everyone has to add them again.
    - `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` gives you `AGENT_SECRET`.
    - `npm run vapid` prints `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`.
-   - Go to Vercel → your project → **Settings → Environment Variables** and add: `TOKEN_ENCRYPTION_KEY`, `AGENT_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (your site address, `https://YOUR-SITE.vercel.app`, not your email), `SITE_URL` (`https://YOUR-SITE.vercel.app`, no slash at the end), `OWNER_EMAIL` (the email you sign in with), `SHARED_AI_FOR_FRIENDS` (`off`), `INVITE_CODE` (a word only your friends know), plus the Google and Spotify values from steps 3 and 4. Don't add `AI_MOCK` in Vercel.
+   - Go to Vercel → your project → **Settings → Environment Variables** and add: `TOKEN_ENCRYPTION_KEY`, `AGENT_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:` followed by your email), `SITE_URL` (`https://YOUR-SITE.vercel.app`, no slash at the end), `OWNER_EMAIL` (the email you sign in with), `SHARED_AI_FOR_FRIENDS` (`off`), `INVITE_CODE` (a word only your friends know), plus the Google and Spotify values from steps 3 and 4. Don't add `AI_MOCK` in Vercel.
    - Then **Deployments → ⋯ on the newest one → Redeploy**, so the site picks the new values up.
 
 3. **Google.** Go to console.cloud.google.com → APIs & Services → **Credentials** → your OAuth client. Under **Authorised redirect URIs** add `https://YOUR-SITE.vercel.app/api/google/callback` and `http://localhost:3000/api/google/callback`. Copy the Client ID and secret into Vercel as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. On **OAuth consent screen**, set it to **In production**. If you leave it on "Testing", connections stop working after 7 days. Google will say the app is "unverified". That's fine for you and a few friends: on the warning, tap **Advanced → Go to (site name)**. Your school's Google account might be blocked by the school. If it is, share your school calendar to your personal Google account and connect that one instead.

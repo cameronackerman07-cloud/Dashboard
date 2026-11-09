@@ -16,7 +16,11 @@ export type AssistantAction =
   | { type: "research_topic"; topic: string }
   | { type: "rename_agent"; agent: string; new_name: string }
   | { type: "run_agent"; agent: string }
-  | { type: "open_page"; page: string };
+  | { type: "open_page"; page: string }
+  | { type: "start_study_timer"; minutes: number; subject: string; topic: string | null }
+  | { type: "pause_study_timer" }
+  | { type: "stop_study_timer" }
+  | { type: "study_hours_summary" };
 
 export type ActionType = AssistantAction["type"];
 
@@ -32,10 +36,18 @@ export const ACTION_TYPES: ActionType[] = [
   "rename_agent",
   "run_agent",
   "open_page",
+  "start_study_timer",
+  "pause_study_timer",
+  "stop_study_timer",
+  "study_hours_summary",
 ];
 
 // Small enough to apply straight away when "Ask before changing things" is off.
 export const TINY_ACTIONS = new Set<ActionType>(["add_todo", "log_habit", "open_page"]);
+
+// Low-risk timer actions and read-only answers: these happen straight away,
+// with no confirm step (each one is still checked here first).
+export const INSTANT_ACTIONS = new Set<ActionType>(["start_study_timer", "pause_study_timer", "stop_study_timer", "study_hours_summary"]);
 
 export const MAX_ACTIONS = 5;
 export const MAX_CARDS = 30;
@@ -114,6 +126,15 @@ export function parseAction(raw: unknown, pages: string[]): AssistantAction | nu
       const page = str(o.page, 40).replace(/^\//, "");
       return pages.includes(page) ? { type: "open_page", page } : null;
     }
+    case "start_study_timer": {
+      const minutes = Math.round(Number(o.minutes));
+      if (!Number.isFinite(minutes) || minutes < 1 || minutes > 720) return null;
+      return { type: "start_study_timer", minutes, subject: str(o.subject, 80) || "Study", topic: opt(o.topic, 120) };
+    }
+    case "pause_study_timer":
+    case "stop_study_timer":
+    case "study_hours_summary":
+      return { type: o.type };
     default:
       return null;
   }
@@ -148,4 +169,8 @@ export const ACTION_GUIDE = `Allowed actions (JSON objects with a "type"):
 - {"type":"rename_agent","agent":string,"new_name":string}  (max 24 characters)
 - {"type":"run_agent","agent":string}
 - {"type":"open_page","page":string}
+- {"type":"start_study_timer","minutes":number,"subject":string,"topic":string?}
+- {"type":"pause_study_timer"}
+- {"type":"stop_study_timer"}  (finishes and saves the running timer)
+- {"type":"study_hours_summary"}  (how much they've studied; the site fills in the numbers)
 You cannot delete or edit existing things.`;

@@ -75,6 +75,16 @@ export const NAV: NavGroup[] = [
           "An AI agent checks for new tasks and adds them to your study plan",
         ],
       },
+      {
+        slug: "key-dates",
+        label: "Key dates",
+        short: "Dates",
+        icon: "flag",
+        blurb: "Your exam dates, trials, assessments and countdowns",
+        phase: 6,
+        
+        plans: ["Your own HSC exam dates once NESA releases the timetable", "Countdowns you add yourself"],
+      },
     ],
   },
   {
@@ -123,6 +133,16 @@ export const NAV: NavGroup[] = [
           "Moves things automatically when a new task appears",
           "Adds blocks to your calendar if you want",
         ],
+      },
+      {
+        slug: "timer",
+        label: "Timer",
+        short: "Timer",
+        icon: "timer",
+        blurb: "Study timer and your total external study hours",
+        phase: 6,
+        built: true,
+        plans: ["Timer that survives refreshes and switching devices", "Total external study hours by subject, week and term"],
       },
       {
         slug: "coach",
@@ -244,6 +264,16 @@ export const NAV: NavGroup[] = [
           "Spending by category against monthly limits",
           "Savings goals, and estimated pay from your shifts",
         ],
+      },
+      {
+        slug: "life",
+        label: "My life",
+        short: "Life",
+        icon: "life",
+        blurb: "Your week outside school, kept in balance",
+        phase: 6,
+        
+        plans: ["Training, family, social and work in one week view", "Asks \"Should I go?\" against your real schedule"],
       },
       {
         slug: "habits",

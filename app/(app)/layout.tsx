@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { AppBadge } from "@/components/AutoRefresh";
 import { Sidebar } from "@/components/Sidebar";
+import { TimerChip } from "@/components/TimerChip";
+import { activeSession } from "@/lib/study-sessions";
 import { ensureDefaultAgents } from "@/lib/agents/defaults";
 import { initials } from "@/lib/auth";
 import { getProfile } from "@/lib/profile";
@@ -18,21 +20,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // Badge the Assignments nav item with the number of tasks still to do.
   const supabase = await createClient();
-  const [{ count }, { count: unread }] = await Promise.all([
+  const [{ count }, { count: unread }, , timer] = await Promise.all([
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("done", false),
     supabase.from("reports").select("id", { count: "exact", head: true }).is("read_at", null),
     ensureDefaultAgents(profile.id).catch(() => undefined),
+    activeSession(supabase, profile.id).catch(() => null),
   ]);
 
   return (
     <div className="shell">
       <Sidebar
-        badges={{ assignments: count ?? 0, inbox: unread ?? 0 }}
+        badges={{ assignments: count ?? 0, inbox: unread ?? 0, ...(timer ? { timer: "ON" } : {}) }}
         displayName={profile.displayName}
         initials={initials(profile.displayName)}
         userEmail={profile.email}
       />
       {children}
+      <TimerChip session={timer} serverNow={Date.now()} />
       <AppBadge count={unread ?? 0} />
     </div>
   );

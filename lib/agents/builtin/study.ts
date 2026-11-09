@@ -1,5 +1,6 @@
 import { staleSubjects, weakestTopics, type Assessment, type TopicStat } from "@/lib/coach";
 import { dayKey, formatShortDate, sydneyInstant } from "@/lib/time";
+import { hoursText } from "@/lib/study-time";
 import type { AgentDefinition, Finding } from "../types";
 
 // Study coach (pure code): weakest flashcard topics, subjects you haven't
@@ -30,6 +31,13 @@ export const study: AgentDefinition = {
       ...weak.slice(0, 3).map((t) => `${t.subject} — ${t.topic === "General" ? t.module : t.topic} (${t.lapses} misses, ${t.due} due)`),
       ...stale.map((s) => `${s.subject} — ${s.daysSince == null ? "not studied yet" : `${s.daysSince} days since you studied it`}`),
     ];
+    // Subjects with the least timed study this week (from the Timer).
+    const time = await ctx.read<{ week: number; weekBySubject: { subject: string; seconds: number }[] }>("study_time").catch(() => null);
+    if (time && time.week > 0) {
+      const studied = new Map(time.weekBySubject.map((x) => [x.subject, x.seconds]));
+      const quiet = stats.map((s) => s.subject).filter((sub, i, a) => a.indexOf(sub) === i && !studied.has(sub)).slice(0, 2);
+      if (quiet.length) focus.push(`No timed study yet this week for ${quiet.join(" or ")} (${hoursText(time.week)} logged in total this week)`);
+    }
     if (focus.length === 0) return [];
     return [
       {

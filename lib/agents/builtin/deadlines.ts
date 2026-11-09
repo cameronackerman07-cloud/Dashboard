@@ -1,5 +1,6 @@
 import { dueWithoutStudy, findClashes, lateBeforeDue, loadRating, type DueItem, type TimedItem } from "@/lib/deadlines";
 import { addDays, dayKey, formatShortDate, formatTime, mondayOf, sydneyInstant, weekday } from "@/lib/time";
+import { hoursText } from "@/lib/study-time";
 import type { AgentDefinition, Finding } from "../types";
 
 // Deadlines & clashes (pure code, no AI): overlapping shifts, games, gigs,
@@ -81,10 +82,13 @@ export const deadlines: AgentDefinition = {
     const to = sydneyInstant(addDays(weekStart, 7));
     const inWeek = (t: number) => t >= from && t < to;
     const load = loadRating(due.filter((t) => inWeek(t.due)).length, shifts.filter((s) => inWeek(s.start)).length, events.filter((e) => inWeek(e.start)).length);
+    // Logged study time counts too: a heavy week with lots of study already done is lighter than it looks.
+    const study = await ctx.read<{ week: number }>("study_time").catch(() => null);
+    const studied = study && weekStart === mondayOf(today) && study.week >= 600 ? ` You've logged ${hoursText(study.week)} of study so far this week.` : "";
     findings.push({
       category: "week_load",
       title: `Week of ${formatShortDate(from)}: ${load} load`,
-      body: load === "heavy" ? "A heavy week. Keep study blocks short, protect sleep, and say no to extra shifts if you can." : undefined,
+      body: load === "heavy" ? `A heavy week. Keep study blocks short, protect sleep, and say no to extra shifts if you can.${studied}` : studied.trim() || undefined,
       importance: load === "heavy" ? 3 : 1,
       dedupeKey: `load:${weekStart}:${load}`,
       data: { load, weekStart },

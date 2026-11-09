@@ -19,6 +19,10 @@ const RECIPES: Recipe[] = [
   { name: "Log habit", phrase: "Log habit", path: "log-habit", method: "POST", body: `{"habit": "<Ask for Input>"}`, finish: "Before it, add Ask for Input (\"Which habit?\"). Put the answer in a JSON key habit. End with Speak Text.", write: true },
   { name: "Ask The BRIAN", phrase: "Ask The BRIAN", path: "ask", method: "POST", body: `{"question": "<Dictated Text>"}`, finish: "Before it, add Dictate Text. JSON key question = Dictated Text. End with Speak Text. Uses your own AI key.", write: true },
   { name: "Cleaning hours", phrase: "Cleaning hours", path: "cleaner-hours", method: "GET", finish: "Add Speak Text or Send Message with the Contents of URL." },
+  { name: "Start studying", phrase: "Start studying", path: "study/start", method: "POST", body: `{"minutes": 25, "subject": "<Ask for Input>"}`, finish: "Before it, add Ask for Input (\"Which subject?\"). JSON keys: minutes (a number, e.g. 25) and subject = Provided Input. End with Speak Text. The \"Time's up\" alert arrives as a notification.", write: true },
+  { name: "Stop studying", phrase: "Stop studying", path: "study/stop", method: "POST", body: "{}", finish: "End with Speak Text. It saves the time you studied.", write: true },
+  { name: "Study hours", phrase: "How much have I studied", path: "study/status", method: "GET", finish: "Add Speak Text with the Contents of URL." },
+  { name: "HSC countdown", phrase: "How long until the HSC", path: "hsc", method: "GET", finish: "Add Speak Text with the Contents of URL." },
 ];
 
 function copy(text: string, set: (r: Reply) => void) {

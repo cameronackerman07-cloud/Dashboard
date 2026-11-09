@@ -6,7 +6,9 @@ import { sendPush } from "@/lib/push";
 import { htmlToText, fetchPage } from "@/lib/safe-fetch";
 import { addDays, dayKey, mondayOf, monthRange, monthKey, sydneyInstant } from "@/lib/time";
 import { sanitizeForAI } from "./sanitize";
-import type { AgentContext, AgentRow, NewReport, ReportKind, SourceId, StoredFinding } from "./types";
+import { ALWAYS_SOURCES, type AgentContext, type AgentRow, type NewReport, type ReportKind, type SourceId, type StoredFinding } from "./types";
+import { bySubject, dailyTotals, sumBetween, type StudySession } from "@/lib/study-time";
+import { countdownLabel } from "@/lib/hsc-dates";
 
 // Builds what an agent can see. Every query uses the service-role client, so
 // every one is filtered by user_id explicitly. Agents never get keys, tokens or
@@ -128,6 +130,36 @@ export async function readSource(db: Db, userId: string, source: SourceId, agent
       );
     case "profile_confirmed":
       return safe(db.from("profile_facts").select("category, text").eq("user_id", userId).eq("status", "confirmed").limit(50), []);
+    case "study_time": {
+      const rows = await safe(
+        db.from("study_sessions").select("subject, started_at, counted_seconds, status, counts_as_external, source").eq("user_id", userId).in("status", ["completed", "auto_closed"]).limit(20_000),
+        [] as StudySession[],
+      );
+      const days = dailyTotals(rows);
+      const monday = mondayOf(today);
+      const weekRows = rows.filter((r) => dayKey(new Date(r.started_at).getTime()) >= monday);
+      const lastWeekRows = rows.filter((r) => {
+        const d = dayKey(new Date(r.started_at).getTime());
+        return d >= addDays(monday, -7) && d < monday;
+      });
+      return {
+        today: days.get(today) ?? 0,
+        yesterday: days.get(addDays(today, -1)) ?? 0,
+        week: sumBetween(days, monday, addDays(monday, 7)),
+        lastWeek: sumBetween(days, addDays(monday, -7), monday),
+        total: [...days.values()].reduce((a, b) => a + b, 0),
+        weekBySubject: bySubject(weekRows),
+        lastWeekBySubject: bySubject(lastWeekRows),
+        perDay: Array.from({ length: 14 }, (_, i) => addDays(today, i - 13)).map((d) => ({ day: d, seconds: days.get(d) ?? 0 })),
+      };
+    }
+    case "key_dates": {
+      const dates = await safe(
+        db.from("key_dates").select("title, starts_at, kind, course").eq("user_id", userId).gte("starts_at", iso(sydneyInstant(today))).order("starts_at", { ascending: true }).limit(40),
+        [] as { title: string; starts_at: string; kind: string; course: string | null }[],
+      );
+      return { hsc: countdownLabel(now), dates };
+    }
     case "web_sources": {
       const urls = (Array.isArray(agent.config?.web_sources) ? (agent.config.web_sources as unknown[]) : []).filter((u): u is string => typeof u === "string").slice(0, 3);
       const out: { url: string; text: string; error?: string }[] = [];
@@ -181,7 +213,7 @@ export function buildContext(
       agent.config = { ...agent.config, _hash: newHash };
     },
     read: async <T,>(source: SourceId) => {
-      if (!agent.sources.includes(source)) throw new Error(`This agent isn't allowed to read ${source}.`);
+      if (!agent.sources.includes(source) && !ALWAYS_SOURCES.has(source)) throw new Error(`This agent isn't allowed to read ${source}.`);
       if (!cache.has(source)) cache.set(source, readSource(db, agent.user_id, source, agent, opts.now));
       return (await cache.get(source)) as T;
     },

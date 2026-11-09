@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { activePlan } from "@/lib/budget-plan";
 import { planTotals } from "@/lib/budget-plan-core";
 import { formatCents } from "@/lib/money";
+import { countdownLabel, hscSentence } from "@/lib/hsc-dates";
 import { addDays, dayKey, formatDayKey, formatTime, mondayOf, sydneyInstant } from "@/lib/time";
 
 // JSON endpoints for iPhone Shortcuts and Siri. Auth: "Authorization: Bearer
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 type Ctx = { params: Promise<{ action: string }> };
-const READ = new Set(["due", "today", "next-shift", "cleaner-hours", "todos", "budget", "ping"]);
+const READ = new Set(["due", "today", "next-shift", "cleaner-hours", "todos", "budget", "ping", "hsc"]);
 const WRITE = new Set(["add-todo", "add-note", "log-habit", "ask"]);
 
 function reply(request: Request, json: Record<string, unknown>, text: string, status = 200) {
@@ -47,6 +48,17 @@ async function handle(request: Request, { params }: Ctx) {
   switch (action) {
     case "ping":
       return reply(request, { ok: true }, "Connected to Dashboard.");
+
+    case "hsc": {
+      const c = countdownLabel(now);
+      const { data: exam } = await db.from("key_dates").select("title, course, starts_at").eq("user_id", uid).eq("kind", "exam").gte("starts_at", new Date(now).toISOString()).order("starts_at", { ascending: true }).limit(1).maybeSingle();
+      let text = hscSentence(now);
+      if (exam) {
+        const d = Math.round((sydneyInstant(dayKey(new Date(exam.starts_at as string).getTime())) - sydneyInstant(today)) / 86_400_000);
+        text += ` Your first exam, ${exam.course ?? exam.title}, is in ${d} day${d === 1 ? "" : "s"}.`;
+      }
+      return reply(request, { ok: true, days: c.days, date: c.date }, text);
+    }
 
     case "due": {
       const until = new Date(sydneyInstant(addDays(today, 3))).toISOString();

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Icon } from "@/components/Icon";
 import { SubjectOptions } from "@/components/SubjectSelect";
@@ -261,6 +262,12 @@ export function WeekPlanner({ weekStart, blocks, plan }: { weekStart: string; bl
                             {b.source === "ai" ? " · AI" : ""}
                           </span>
                         </div>
+                        {b.kind !== "rest" && !b.done ? (
+                          <Link href={`/timer?block=${b.id}`} className="btn btn-small" aria-label={`Start a timer for ${b.subject ?? "this block"}`}>
+                            <Icon name="timer" size={16} />
+                            Start timer
+                          </Link>
+                        ) : null}
                         <button type="button" className="task-del" aria-label="Edit block" onClick={() => setEditId(b.id)}>
                           <Icon name="edit" size={16} />
                         </button>

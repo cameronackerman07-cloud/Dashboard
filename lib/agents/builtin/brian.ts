@@ -2,6 +2,8 @@ import { styleGuide } from "@/lib/about-me";
 import { formatCents } from "@/lib/money";
 import { paidMinutes, formatHours, type Job, type Shift } from "@/lib/shifts";
 import { addDays, dayKey, formatTime, mondayOf, sydneyInstant, timeKey, weekday } from "@/lib/time";
+import { isMilestone } from "@/lib/hsc-dates";
+import { hoursText } from "@/lib/study-time";
 import type { AgentContext, AgentDefinition, Finding, NewReport, ReportSection, StoredFinding } from "../types";
 
 // The BRIAN: the chief agent. Every 30 minutes it checks whether a report is
@@ -12,6 +14,8 @@ import type { AgentContext, AgentDefinition, Finding, NewReport, ReportSection, 
 type Task = { id: string; title: string; course: string | null; due_at: string | null };
 type Todo = { id: string; title: string; due_on: string | null; subject: string | null };
 type Lesson = { day_of_week: number; period: string | null; subject: string; room: string | null; week: string };
+type StudyTime = { today: number; yesterday: number; week: number; lastWeek: number; total: number; weekBySubject: { subject: string; seconds: number }[]; lastWeekBySubject: { subject: string; seconds: number }[] };
+type KeyDates = { hsc: { days: number; parts: string; date: string }; dates: { title: string; starts_at: string; kind: string; course: string | null }[] };
 
 const WEATHER: Record<number, string> = {
   0: "clear", 1: "mostly clear", 2: "partly cloudy", 3: "cloudy", 45: "foggy", 48: "foggy",
@@ -107,8 +111,20 @@ async function briefing(ctx: AgentContext, findings: StoredFinding[]): Promise<N
   const habitsLeft = h.habits.filter((x) => !doneToday.has(x.id)).map((x) => x.name);
   if (habitsLeft.length) sections.push({ heading: "Habits to do", points: habitsLeft });
 
+  const study = await ctx.read<StudyTime>("study_time").catch(() => null);
   const focus = findings.find((f) => f.category === "study_focus");
-  if (focus) sections.push({ heading: "Study focus", points: [focus.title] });
+  const studyPoints = [
+    ...(study && study.yesterday >= 60 ? [`Yesterday you studied ${hoursText(study.yesterday)}. ${hoursText(study.total)} in total so far.`] : []),
+    ...(focus ? [focus.title] : []),
+  ];
+  if (studyPoints.length) sections.push({ heading: "Study", points: studyPoints });
+
+  // The HSC countdown: every Monday, and on milestone days.
+  const kd = await ctx.read<KeyDates>("key_dates").catch(() => null);
+  if (kd && kd.hsc.days > 0 && (weekday(ctx.now) === 1 || isMilestone(kd.hsc.days))) {
+    const soon = kd.dates.filter((d) => d.kind !== "term").slice(0, 2).map((d) => `${d.course ?? d.title}: ${dayKey(new Date(d.starts_at).getTime())}`);
+    sections.push({ heading: "HSC countdown", points: [`${kd.hsc.days} days (${kd.hsc.parts}) until the HSC written exams begin on ${kd.hsc.date}.`, ...soon] });
+  }
   const fs = findingsSection(ctx, findings.filter((f) => f !== focus), 6);
   if (fs) sections.push(fs);
 
@@ -159,6 +175,28 @@ async function sundayReset(ctx: AgentContext, findings: StoredFinding[]): Promis
           : "No budget plan for next week yet: on Monday open Pay & budget and tap Plan my week, or ask The BRIAN.",
       ],
     });
+
+  // Study hours this week by subject, against the planner.
+  const study = await ctx.read<StudyTime>("study_time").catch(() => null);
+  const cal = await ctx.read<{ blocks: { subject: string | null; starts_at: string | null; ends_at: string | null; kind: string }[] }>("calendar").catch(() => ({ blocks: [] }));
+  if (study) {
+    const monday = mondayOf(today);
+    const planned = new Map<string, number>();
+    for (const b of cal.blocks) {
+      if (!b.starts_at || !b.ends_at || b.kind === "rest") continue;
+      const d = dayKey(new Date(b.starts_at).getTime());
+      if (d < monday || d >= nextMonday) continue;
+      const k = b.subject ?? "Study";
+      planned.set(k, (planned.get(k) ?? 0) + (new Date(b.ends_at).getTime() - new Date(b.starts_at).getTime()) / 1000);
+    }
+    const subjects = new Set([...study.weekBySubject.map((x) => x.subject), ...planned.keys()]);
+    const points = [...subjects].slice(0, 8).map((sub) => {
+      const did = study.weekBySubject.find((x) => x.subject === sub)?.seconds ?? 0;
+      const plan = planned.get(sub) ?? 0;
+      return `${sub}: ${hoursText(did)}${plan ? ` of ${hoursText(plan)} planned` : ""}`;
+    });
+    sections.push({ heading: "Study this week", points: [`${hoursText(study.week)} of external study this week (${hoursText(study.total)} in total).`, ...points] });
+  }
 
   const fs = findingsSection(ctx, findings, 6);
   if (fs) sections.push(fs);

@@ -40,6 +40,11 @@ const PATHS = {
   coach: "M4 20V10l8-6 8 6v10M9 20v-6h6v6",
   ideas: "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z",
   profile: "M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0",
+  timer: "M12 8a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM12 11.5v3l2 1.5M10 3h4M12 3v2M18 6.5l1.5-1.5",
+  life: "M3 21V9l9-6 9 6v12M8 21v-5a4 4 0 0 1 8 0v5M3 21h18",
+  flag: "M5 21V4M5 4h11l-2 4 2 4H5",
+  slides: "M3 4h18v12H3zM12 16v4M8 20h8M7 8h6M7 11h4",
+  stop: "M7 7h10v10H7z",
 } as const;
 
 export type IconName = keyof typeof PATHS;
