@@ -2,6 +2,10 @@ import Link from "next/link";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { DueSoon } from "@/components/DueSoon";
 import { Greeting } from "@/components/Greeting";
+import { HscCountdown, type CountdownDate } from "@/components/HscCountdown";
+import { timetableReleased } from "@/lib/hsc-dates";
+import { studySummary } from "@/lib/study-sessions";
+import { hoursText } from "@/lib/study-time";
 import { Icon } from "@/components/Icon";
 import { SpotifyTile } from "@/components/SpotifyTile";
 import { getCalendarConnections, loadEvents } from "@/lib/calendar";
@@ -16,6 +20,7 @@ import { addDays, dayKey, formatDay, formatDayKey, formatTime, mondayOf, startOf
 type TodayRow = { key: string; slot: string; name: string; sub: string | null; chip: "NOW" | "NEXT" | null };
 
 export default async function Home() {
+  const profile = await getProfile();
   // New Canvas work first, so "Due soon" includes it (at most every 30 minutes).
   await syncCanvas({ maxAgeMs: AUTO_SYNC_MS });
   const supabase = await createClient();
@@ -82,6 +87,21 @@ export default async function Home() {
     ? await supabase.from("jobs").select("id, name, default_rate_cents, kind").eq("id", nextShift.job_id).maybeSingle()
     : { data: null };
 
+  // HSC countdown: my own key dates and total external study.
+  const [{ data: dateRows }, study] = await Promise.all([
+    supabase.from("key_dates").select("id, title, starts_at, kind, course, pinned").gte("starts_at", new Date(startOfDay(now)).toISOString()).order("starts_at", { ascending: true }).limit(20),
+    profile ? studySummary(supabase, profile.id, now) : Promise.resolve({ total: 0 }),
+  ]);
+  const keyDates = ((dateRows ?? []) as { id: string; title: string; starts_at: string; kind: string; course: string | null; pinned: boolean }[]).map((d) => ({
+    id: d.id,
+    title: d.title,
+    day: dayKey(new Date(d.starts_at).getTime()),
+    kind: d.kind,
+    course: d.course,
+    pinned: d.pinned,
+  }));
+  const firstExam: CountdownDate | null = keyDates.find((d) => d.kind === "exam") ?? null;
+
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   const logged = new Set(((habitLogs ?? []) as { habit_id: string; day: string }[]).map((l) => `${l.habit_id}|${l.day}`));
 
@@ -125,18 +145,12 @@ export default async function Home() {
     <main className="main">
       <div className="page-head">
         <AutoRefresh />
-        <Greeting name={(await getProfile())?.displayName ?? "there"} />
+        <Greeting name={profile?.displayName ?? "there"} />
         <button type="button" className="icon-btn desktop-only" aria-label="Notifications">
           <Icon name="bell" />
         </button>
       </div>
 
-      <div className="notice" role="note">
-        <span>The countdowns are examples for now. Connect Canvas and your timetable to fill in the rest.</span>
-        <Link href="/settings" className="card-link">
-          Open connections →
-        </Link>
-      </div>
 
       <form className="ask" action="/assistant">
         <label>
@@ -212,27 +226,13 @@ export default async function Home() {
           <DueSoon tasks={dueSoon} />
         </section>
 
-        <section className="card" aria-label="Countdowns">
-          <h2 className="card-title">Countdowns</h2>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span className="big-number">2</span>
-            <span style={{ fontSize: 14, fontWeight: 500 }}>days · Maths Adv practice set</span>
-          </div>
-          <div className="rows" style={{ borderTop: "1px solid var(--line-soft)" }}>
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <span>Engineering report</span>
-              <strong>3 days</strong>
-            </div>
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <span>Term 4 ends</span>
-              <strong>— days</strong>
-            </div>
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <span>HSC exams</span>
-              <strong>— days</strong>
-            </div>
-          </div>
-        </section>
+        <HscCountdown
+          serverNow={now}
+          firstExam={firstExam}
+          dates={keyDates.filter((d) => d.pinned || d.kind !== "term").slice(0, 4)}
+          totalStudy={hoursText(study.total)}
+          released={timetableReleased(now)}
+        />
 
         <section className="card" aria-label="Quick actions">
           <h2 className="card-title">Quick actions</h2>
@@ -245,9 +245,9 @@ export default async function Home() {
               <Icon name="summaries" size={18} />
               Upload notes
             </Link>
-            <Link href="/planner" className="action">
-              <Icon name="timetable" size={18} />
-              25-min focus
+            <Link href="/timer" className="action">
+              <Icon name="timer" size={18} />
+              Study timer
             </Link>
             <Link href="/tutor" className="action">
               <Icon name="tutor" size={18} />

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
+import { hscSentence } from "@/lib/hsc-dates";
 import { COURSES } from "@/lib/nav";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, dayKey, formatDayKey, isDayKey, mondayOf, sydneyInstant } from "@/lib/time";
@@ -44,6 +45,7 @@ export default async function PlannerPage({ searchParams }: Props) {
         title="Study planner"
         lede="Your study week in Sydney time. Add blocks yourself, or let The BRIAN plan the week around your classes, shifts and sleep."
       />
+      <p className="card-meta">{hscSentence(Date.now())}</p>
 
       <nav className="week-nav" aria-label="Choose a week">
         <Link className="btn" href={`/planner?week=${addDays(monday, -7)}`} aria-label="Previous week">

@@ -850,3 +850,13 @@ details > summary.btn { list-style: none; display: inline-flex; margin-bottom: 1
 .plain-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .plain-table th, .plain-table td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line-soft); }
 .plain-table th { font-size: 12px; color: var(--muted); font-weight: 600; }
+
+/* ---------- HSC countdown ---------- */
+.hsc-card { grid-column: span 1; }
+.hsc-big { display: flex; align-items: baseline; gap: 8px; }
+.hsc-number { font-size: 64px; line-height: 1; }
+.hsc-unit { font-size: 18px; font-weight: 600; }
+.exam-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.exam-row { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; margin: 0; display: grid; grid-template-columns: 1fr 120px; gap: 8px; min-width: 0; }
+.exam-row legend { padding: 0 4px; }
+.exam-grid .note-actions { grid-column: 1 / -1; }

@@ -82,6 +82,7 @@ export const NAV: NavGroup[] = [
         icon: "flag",
         blurb: "Your exam dates, trials, assessments and countdowns",
         phase: 6,
+        built: true,
         
         plans: ["Your own HSC exam dates once NESA releases the timetable", "Countdowns you add yourself"],
       },

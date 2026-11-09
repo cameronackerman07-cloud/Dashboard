@@ -25,7 +25,7 @@ Update this after every stage. A new session continues from the first unchecked 
 
 - [x] Checked prerequisites — login/RLS, lib/ai.ts per-user keys, sanitizeForAI, redactSecrets, safe-fetch, agents + The BRIAN, assistant confirm/undo, planner, Summaries/Flashcards, subjects, device tokens, push all exist.
 - [x] Stage M — study timer: supabase/phase6.sql (study_sessions with one-open-session index, study_settings), lib/study-time.ts (timestamp maths, grace/auto-close, midnight split, streaks, projection), lib/study-sessions.ts, /timer (ring, presets, Pomodoro, wake lock, offline Finish queue, stats, heatmap, history, manual entry), /timer/journey + /api/timer/export, TimerChip, /api/timer/sweep + tick, Siri study endpoints, assistant timer actions, planner "Start timer", BRIAN/coach/deadlines use study_time.
-- [ ] Stage N — HSC countdown on Home + key dates
+- [x] Stage N — lib/hsc-dates.ts (official dates + source + checkedOn), key_dates table, /key-dates (official dates, Add my exam dates for the seven courses, countdowns, pin to Home), Home HscCountdown card (Sydney days, midnight refresh, first-exam switch, study total), planner header line, Coach roadmap, BRIAN weekly/milestone countdown, /api/shortcuts/hsc, hsc_dates weekly code-only check agent, tests/hsc.test.ts.
 - [ ] Stage O — PowerPoint and direct-to-Storage uploads
 - [ ] Stage P — My life planner and "Should I go?"
 - [ ] Stage Q — voice
